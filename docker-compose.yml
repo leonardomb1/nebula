@@ -1,0 +1,42 @@
+services:
+  nebula:
+    # CI-built image (see .github/workflows/docker.yml — pushed to GHCR on main).
+    # `docker compose build` still works for local builds; deploys should
+    # `docker compose pull && docker compose up -d`.
+    image: ghcr.io/leonardomb1/nebula:latest
+    build: .
+    ports:
+      - '3000:3000'
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      # app state (session/token store) — named volume, NOT a host bind:
+      # bind mounts inherit host ownership and break the non-root user's writes.
+      - nebula-data:/app/data
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "fetch(''http://localhost:3000/healthz'').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Local dev database only — production points at an external StarRocks cluster.
+  # Start with: docker compose --profile dev up -d starrocks
+  # Connect with: mysql -h127.0.0.1 -P9030 -uroot (no password)
+  # JWT passthrough needs StarRocks >= 3.5 (security integrations, SSL on port 9030).
+  starrocks:
+    image: starrocks/allin1-ubuntu:3.5-latest
+    profiles: [dev]
+    ports:
+      - '9030:9030' # FE MySQL protocol
+      - '8030:8030' # FE HTTP (metrics, query_detail API, web UI)
+      - '8040:8040' # BE HTTP (metrics)
+    volumes:
+      - starrocks-data:/data/deploy
+    restart: unless-stopped
+
+volumes:
+  nebula-data:
+  starrocks-data:

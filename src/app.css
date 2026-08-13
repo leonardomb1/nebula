@@ -1,0 +1,47 @@
+@import 'tailwindcss';
+
+/*
+ * Nebula design tokens — the single source of truth for the palette.
+ * Space-inspired: near-black indigo ground, violet primary, blue secondary.
+ * Consumed by UI chrome, the Monaco theme, and dashboard charts.
+ */
+:root {
+	/* ground */
+	--nebula-bg: #0a0a14;
+	--nebula-surface: #12111f;
+	--nebula-surface-2: #1a1830;
+	--nebula-border: #2b2749;
+
+	/* ink */
+	--nebula-text: #e4e2f4;
+	--nebula-text-muted: #8f8ab3;
+
+	/* accents */
+	--nebula-primary: #a78bfa; /* violet */
+	--nebula-primary-strong: #8b5cf6;
+	--nebula-secondary: #60a5fa; /* blue */
+	--nebula-glow: #c4b5fd;
+
+	/* signals */
+	--nebula-ok: #34d399;
+	--nebula-warn: #fbbf24;
+	--nebula-err: #f87171;
+}
+
+@theme {
+	--color-bg: var(--nebula-bg);
+	--color-surface: var(--nebula-surface);
+	--color-surface-2: var(--nebula-surface-2);
+	--color-edge: var(--nebula-border);
+	--color-ink: var(--nebula-text);
+	--color-ink-muted: var(--nebula-text-muted);
+	--color-primary: var(--nebula-primary);
+	--color-primary-strong: var(--nebula-primary-strong);
+	--color-secondary: var(--nebula-secondary);
+	--color-glow: var(--nebula-glow);
+}
+
+body {
+	background: var(--nebula-bg);
+	color: var(--nebula-text);
+}
