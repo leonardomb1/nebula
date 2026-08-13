@@ -13,6 +13,8 @@ export interface ResultSet {
 	elapsedMs: number | null;
 	truncated: boolean;
 	finished: boolean;
+	/** StarRocks query id — set when the run was profiled. */
+	queryId: string | null;
 }
 
 export type RunStatus = 'idle' | 'starting' | 'running' | 'done' | 'error' | 'cancelled';
@@ -30,6 +32,39 @@ function idleRun(): RunView {
 	return { id: null, status: 'idle', resultsets: [], errors: [], elapsedMs: null, needsLogin: false };
 }
 
+export interface PlanNode {
+	id: number;
+	type: string;
+	fragment: number;
+	detail: string[];
+	cardinality: number | null;
+	subtitle: string | null;
+	/** Present on profile overlays only. */
+	actualRows?: number | null;
+	timeMs?: number;
+	timePct?: number;
+}
+
+export interface ProfileSummary {
+	totalMs: number | null;
+	cpuMs: number | null;
+	wallMs: number | null;
+	operatorMs: number | null;
+	peakMemory: string | null;
+}
+
+export interface PlanEdge {
+	from: number;
+	to: number;
+	kind: 'local' | 'exchange';
+}
+
+export type PlanState =
+	| null
+	| 'loading'
+	| { nodes: PlanNode[]; edges: PlanEdge[]; raw?: string; summary?: ProfileSummary }
+	| { error: string };
+
 let tabCounter = 0;
 
 export class Tab {
@@ -37,9 +72,11 @@ export class Tab {
 	title = $state('');
 	sql = $state('');
 	database = $state<string | null>(null);
+	profileEnabled = $state(false);
 	run = $state<RunView>(idleRun());
-	/** Result-panel selection: index into resultsets, or -1 for messages. */
+	/** Result-panel selection: resultset index, -1 messages, -2 plan. */
 	activeResult = $state(0);
+	plan = $state<PlanState>(null);
 	#source: EventSource | null = null;
 
 	constructor(title: string) {
@@ -61,7 +98,11 @@ export class Tab {
 		const res = await fetch('/api/query', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ sql, database: this.database ?? undefined })
+			body: JSON.stringify({
+				sql,
+				database: this.database ?? undefined,
+				profile: this.profileEnabled
+			})
 		}).catch(() => null);
 
 		if (!res || !res.ok) {
@@ -90,7 +131,8 @@ export class Tab {
 						affectedRows: null,
 						elapsedMs: null,
 						truncated: false,
-						finished: false
+						finished: false,
+						queryId: null
 					};
 					this.activeResult = event.statement;
 					break;
@@ -110,12 +152,14 @@ export class Tab {
 						affectedRows: null,
 						elapsedMs: null,
 						truncated: false,
-						finished: false
+						finished: false,
+						queryId: null
 					});
 					set.affectedRows = event.affectedRows;
 					set.elapsedMs = event.elapsedMs;
 					set.truncated = event.truncated;
 					set.finished = true;
+					set.queryId = event.queryId ?? null;
 					break;
 				}
 				case 'error':
@@ -142,6 +186,47 @@ export class Tab {
 		};
 	}
 
+	async explain(sqlOverride?: string): Promise<void> {
+		const sql = (sqlOverride ?? this.sql).trim();
+		if (!sql || this.plan === 'loading') return;
+
+		this.plan = 'loading';
+		this.activeResult = -2;
+
+		const res = await fetch('/api/explain', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ sql, database: this.database ?? undefined })
+		}).catch(() => null);
+
+		if (!res) {
+			this.plan = { error: 'network error' };
+			return;
+		}
+		const payload = await res.json().catch(() => null);
+		this.plan = res.ok && payload ? payload : { error: payload?.error ?? `HTTP ${res.status}` };
+	}
+
+	/** Fetches the executed profile for a statement and shows it as the plan. */
+	async loadProfile(queryId: string): Promise<void> {
+		if (this.plan === 'loading') return;
+		this.plan = 'loading';
+		this.activeResult = -2;
+
+		const res = await fetch('/api/profile', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ queryId })
+		}).catch(() => null);
+
+		if (!res) {
+			this.plan = { error: 'network error' };
+			return;
+		}
+		const payload = await res.json().catch(() => null);
+		this.plan = res.ok && payload ? payload : { error: payload?.message ?? `HTTP ${res.status}` };
+	}
+
 	async cancel(): Promise<void> {
 		if (!this.run.id || !this.running) return;
 		await fetch(`/api/query/${this.run.id}/cancel`, { method: 'POST' }).catch(() => null);
@@ -152,10 +237,17 @@ export class Tab {
 	}
 }
 
+export interface TableInfo {
+	name: string;
+	columns: { name: string; type: string }[];
+}
+
 export class Workbench {
 	tabs = $state<Tab[]>([]);
 	activeTabId = $state<string | null>(null);
 	databases = $state<string[]>([]);
+	/** Schema cache shared by the explorer tree and editor completions. */
+	tablesByDb = $state<Record<string, TableInfo[] | 'loading' | 'error'>>({});
 
 	get activeTab(): Tab | null {
 		return this.tabs.find((tab) => tab.id === this.activeTabId) ?? null;
@@ -185,5 +277,17 @@ export class Workbench {
 		const { databases } = (await res.json()) as { databases: string[] };
 		this.databases = databases;
 		for (const tab of this.tabs) tab.database ??= databases[0] ?? null;
+	}
+
+	async loadTables(db: string): Promise<void> {
+		if (this.tablesByDb[db]) return;
+		this.tablesByDb[db] = 'loading';
+		const res = await fetch(`/api/schema?db=${encodeURIComponent(db)}`).catch(() => null);
+		if (!res?.ok) {
+			this.tablesByDb[db] = 'error';
+			return;
+		}
+		const { tables } = (await res.json()) as { tables: TableInfo[] };
+		this.tablesByDb[db] = tables;
 	}
 }

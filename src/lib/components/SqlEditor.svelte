@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { monaco as Monaco } from '$lib/monaco';
+	import type { monaco as Monaco, SchemaCompletionContext } from '$lib/monaco';
 
 	let {
 		value = $bindable(''),
-		onRun
+		onRun,
+		completions
 	}: {
 		value?: string;
 		/** Called with the selection when there is one, else the whole buffer. */
 		onRun?: (sql: string) => void;
+		/** Live schema context for autocomplete. */
+		completions?: () => SchemaCompletionContext;
 	} = $props();
 
 	let container: HTMLDivElement;
@@ -18,8 +21,9 @@
 		let disposed = false;
 
 		void (async () => {
-			const { monaco } = await import('$lib/monaco');
+			const { monaco, setCompletionContext } = await import('$lib/monaco');
 			if (disposed) return;
+			if (completions) setCompletionContext(completions);
 
 			editor = monaco.editor.create(container, {
 				value,

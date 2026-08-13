@@ -1,36 +1,26 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages';
+	import type { TableInfo } from '$lib/workbench.svelte';
 
 	let {
 		databases,
+		tablesByDb,
+		loadTables,
 		onInsert
 	}: {
 		databases: string[];
+		tablesByDb: Record<string, TableInfo[] | 'loading' | 'error'>;
+		loadTables: (db: string) => void;
 		/** Double-click inserts a qualified name into the editor. */
 		onInsert?: (text: string) => void;
 	} = $props();
 
-	interface TableInfo {
-		name: string;
-		columns: { name: string; type: string }[];
-	}
-
 	let expandedDbs = $state<Record<string, boolean>>({});
 	let expandedTables = $state<Record<string, boolean>>({});
-	let tablesByDb = $state<Record<string, TableInfo[] | 'loading' | 'error'>>({});
 
-	async function toggleDb(db: string): Promise<void> {
+	function toggleDb(db: string): void {
 		expandedDbs[db] = !expandedDbs[db];
-		if (!expandedDbs[db] || tablesByDb[db]) return;
-
-		tablesByDb[db] = 'loading';
-		const res = await fetch(`/api/schema?db=${encodeURIComponent(db)}`).catch(() => null);
-		if (!res?.ok) {
-			tablesByDb[db] = 'error';
-			return;
-		}
-		const { tables } = (await res.json()) as { tables: TableInfo[] };
-		tablesByDb[db] = tables;
+		if (expandedDbs[db]) loadTables(db);
 	}
 </script>
 

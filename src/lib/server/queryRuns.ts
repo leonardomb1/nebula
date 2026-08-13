@@ -27,6 +27,7 @@ export type RunEvent =
 			affectedRows: number | null;
 			elapsedMs: number;
 			truncated: boolean;
+			queryId: string | null;
 	  }
 	| { type: 'error'; statement: number | null; message: string; needsLogin?: boolean }
 	| { type: 'done'; status: RunStatus; elapsedMs: number };
@@ -38,6 +39,7 @@ export interface QueryRun {
 	username: string;
 	sql: string;
 	database: string | null;
+	profile: boolean;
 	status: RunStatus;
 	startedAt: number;
 	endedAt: number | null;
@@ -93,7 +95,19 @@ interface FieldPacket {
 	type?: number;
 }
 
-function runStatement(run: QueryRun, conn: Connection, sql: string, index: number): Promise<void> {
+interface StatementStats {
+	rowCount: number;
+	affectedRows: number | null;
+	elapsedMs: number;
+	truncated: boolean;
+}
+
+function runStatement(
+	run: QueryRun,
+	conn: Connection,
+	sql: string,
+	index: number
+): Promise<StatementStats> {
 	return new Promise((resolve, reject) => {
 		const started = Date.now();
 		let rowCount = 0;
@@ -151,15 +165,7 @@ function runStatement(run: QueryRun, conn: Connection, sql: string, index: numbe
 			// must not also report success.
 			if (failed) return;
 			flush();
-			emit(run, {
-				type: 'stmt_done',
-				statement: index,
-				rowCount,
-				affectedRows,
-				elapsedMs: Date.now() - started,
-				truncated
-			});
-			resolve();
+			resolve({ rowCount, affectedRows, elapsedMs: Date.now() - started, truncated });
 		});
 
 		query.on('error', (err: Error) => {
@@ -189,12 +195,21 @@ async function execute(run: QueryRun): Promise<void> {
 		run.connId = Number((rows as { id: unknown }[])[0]?.id);
 
 		if (run.database) await conn.query(`USE ${quoteIdent(run.database)}`);
+		// Session-scoped, on the user's own connection — enables the profile
+		// the plan viewer overlays later. Never a server-side config change.
+		if (run.profile) await conn.query('SET enable_profile = true');
 
 		const statements = splitStatements(run.sql);
 		for (let i = 0; i < statements.length; i++) {
 			if (run.cancelRequested) break;
 			try {
-				await runStatement(run, conn, statements[i], i);
+				const stats = await runStatement(run, conn, statements[i], i);
+				let queryId: string | null = null;
+				if (run.profile) {
+					const [idRows] = await conn.query('SELECT last_query_id() AS id');
+					queryId = String((idRows as { id: unknown }[])[0]?.id ?? '') || null;
+				}
+				emit(run, { type: 'stmt_done', statement: i, ...stats, queryId });
 			} catch (error) {
 				// A killed query surfaces as an error on the executing connection.
 				if (run.cancelRequested) break;
@@ -215,12 +230,18 @@ async function execute(run: QueryRun): Promise<void> {
 	}
 }
 
-export function startRun(username: string, sql: string, database: string | null): QueryRun {
+export function startRun(
+	username: string,
+	sql: string,
+	database: string | null,
+	profile = false
+): QueryRun {
 	const run: QueryRun = {
 		id: randomUUID(),
 		username,
 		sql,
 		database,
+		profile,
 		status: 'running',
 		startedAt: Date.now(),
 		endedAt: null,

@@ -5,6 +5,8 @@
 	import SqlEditor from './SqlEditor.svelte';
 	import ResultsGrid from './ResultsGrid.svelte';
 	import SchemaTree from './SchemaTree.svelte';
+	import PlanViewer from './PlanViewer.svelte';
+	import Monitor from './Monitor.svelte';
 
 	let { user }: { user: { username: string; displayName: string } } = $props();
 
@@ -12,6 +14,7 @@
 
 	let sidebarWidth = $state(260);
 	let resultsHeight = $state(280);
+	let view = $state<'editor' | 'monitor'>('editor');
 
 	onMount(() => {
 		workbench.newTab(m.tab_title());
@@ -59,7 +62,24 @@
 		<!-- activity bar -->
 		<aside class="flex w-12 shrink-0 flex-col items-center gap-2 border-r border-edge bg-surface py-3">
 			<span class="text-xl" title="Nebula">🌌</span>
-			<span class="mt-2 rounded bg-surface-2 p-1.5 text-secondary" title={m.explorer()}>▤</span>
+			<button
+				class="mt-2 rounded p-1.5 {view === 'editor'
+					? 'bg-surface-2 text-secondary'
+					: 'text-ink-muted hover:text-ink'}"
+				title={m.explorer()}
+				onclick={() => (view = 'editor')}
+			>
+				▤
+			</button>
+			<button
+				class="rounded p-1.5 {view === 'monitor'
+					? 'bg-surface-2 text-secondary'
+					: 'text-ink-muted hover:text-ink'}"
+				title={m.monitor()}
+				onclick={() => (view = 'monitor')}
+			>
+				∿
+			</button>
 			<a
 				href="/auth/logout"
 				data-sveltekit-preload-data="off"
@@ -70,10 +90,17 @@
 			</a>
 		</aside>
 
+		{#if view === 'monitor'}
+			<div class="min-w-0 flex-1 bg-bg">
+				<Monitor />
+			</div>
+		{:else}
 		<!-- sidebar -->
 		<aside class="shrink-0 border-r border-edge bg-surface" style="width: {sidebarWidth}px">
 			<SchemaTree
 				databases={workbench.databases}
+				tablesByDb={workbench.tablesByDb}
+				loadTables={(db) => void workbench.loadTables(db)}
 				onInsert={(text) => {
 					const tab = workbench.activeTab;
 					if (tab) tab.sql += (tab.sql && !tab.sql.endsWith(' ') ? ' ' : '') + text;
@@ -145,12 +172,35 @@
 					>
 						◼ {m.cancel()}
 					</button>
+					<button
+						class="rounded border border-edge px-3 py-1 text-sm text-ink-muted transition hover:text-ink disabled:opacity-40"
+						disabled={tab.plan === 'loading' || !tab.sql.trim()}
+						onclick={() => tab.explain()}
+					>
+						⑆ {m.explain()}
+					</button>
+					<label class="flex items-center gap-1.5 text-sm text-ink-muted select-none">
+						<input type="checkbox" bind:checked={tab.profileEnabled} class="accent-[--nebula-primary-strong]" />
+						{m.profile_toggle()}
+					</label>
 					<span class="ml-auto text-xs text-ink-muted">{m.run_hint()}</span>
 				</div>
 
 				<!-- editor -->
 				<div class="min-h-0 flex-1">
-					<SqlEditor bind:value={tab.sql} onRun={(sql) => tab.execute(sql)} />
+					<SqlEditor
+						bind:value={tab.sql}
+						onRun={(sql) => tab.execute(sql)}
+						completions={() => ({
+							databases: workbench.databases,
+							database: workbench.activeTab?.database ?? null,
+							tables: (db) => {
+								const cached = workbench.tablesByDb[db];
+								return Array.isArray(cached) ? cached : null;
+							},
+							ensure: (db) => void workbench.loadTables(db)
+						})}
+					/>
 				</div>
 
 				<!-- results panel -->
@@ -178,6 +228,16 @@
 								</span>
 							</button>
 						{/each}
+						{#if tab.plan}
+							<button
+								class="border-b-2 px-2 py-1 {tab.activeResult === -2
+									? 'border-primary text-ink'
+									: 'border-transparent text-ink-muted hover:text-ink'}"
+								onclick={() => (tab.activeResult = -2)}
+							>
+								{m.plan_tab()}
+							</button>
+						{/if}
 						<button
 							class="border-b-2 px-2 py-1 {tab.activeResult === -1
 								? 'border-primary text-ink'
@@ -191,6 +251,35 @@
 								</span>
 							{/if}
 						</button>
+						{#if tab.activeResult >= 0 && tab.run.resultsets[tab.activeResult]?.finished}
+							{@const activeSet = tab.run.resultsets[tab.activeResult]}
+							<span class="ml-auto flex items-center gap-1">
+								{#if activeSet.columns.length > 0 && tab.run.id}
+									<a
+										class="rounded border border-edge px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
+										href="/api/query/{tab.run.id}/export?statement={tab.activeResult}&format=csv"
+										download
+									>
+										CSV
+									</a>
+									<a
+										class="rounded border border-edge px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
+										href="/api/query/{tab.run.id}/export?statement={tab.activeResult}&format=xlsx"
+										download
+									>
+										XLSX
+									</a>
+								{/if}
+								{#if activeSet.queryId}
+									<button
+										class="rounded border border-edge px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
+										onclick={() => tab.loadProfile(activeSet.queryId!)}
+									>
+										⚡ {m.view_profile()}
+									</button>
+								{/if}
+							</span>
+						{/if}
 					</div>
 					<div class="min-h-0 flex-1 bg-bg">
 						{#if tab.activeResult >= 0 && tab.run.resultsets[tab.activeResult]}
@@ -201,6 +290,20 @@
 								<p class="p-3 text-sm text-ink-muted">
 									{m.affected_rows({ n: set.affectedRows ?? 0 })}
 								</p>
+							{/if}
+						{:else if tab.activeResult === -2}
+							{#if tab.plan === 'loading'}
+								<p class="p-3 text-sm text-ink-muted">{m.loading()}</p>
+							{:else if tab.plan && typeof tab.plan === 'object' && 'error' in tab.plan}
+								<p class="p-3 font-mono text-xs" style="color: var(--nebula-err)">
+									{tab.plan.error}
+								</p>
+							{:else if tab.plan && typeof tab.plan === 'object'}
+								<PlanViewer
+									nodes={tab.plan.nodes}
+									edges={tab.plan.edges}
+									summary={tab.plan.summary ?? null}
+								/>
 							{/if}
 						{:else if tab.activeResult === -1}
 							<div class="h-full overflow-auto p-3 font-mono text-xs">
@@ -235,5 +338,6 @@
 				</div>
 			{/if}
 		</div>
+		{/if}
 	</div>
 </div>
