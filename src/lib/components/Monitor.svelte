@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { m } from '$lib/paraglide/messages';
+	import Icon, { type IconName } from './Icon.svelte';
 	import LineChart from './LineChart.svelte';
 
 	/** Sequential violet ramp for the ordered latency quantiles (light→dark). */
@@ -98,28 +99,43 @@
 	);
 </script>
 
-<div class="h-full overflow-auto p-4">
+<div class="h-full overflow-auto p-5">
+	<header class="mb-4 flex items-center gap-2">
+		<Icon name="pulse" size={18} class="text-primary" />
+		<h1 class="text-sm font-semibold tracking-wide text-ink">{m.monitor()}</h1>
+		{#if !unavailable && latest}
+			<span class="flex items-center gap-1.5 text-[11px] text-ink-dim">
+				<span class="h-1.5 w-1.5 rounded-full bg-ok"></span>
+				{POLL_MS / 1000}s
+			</span>
+		{/if}
+	</header>
+
 	{#if unavailable}
 		<p
-			class="mb-4 rounded-lg border border-err/40 bg-err/10 px-4 py-2 text-sm"
-			style="color: var(--nebula-err)"
+			class="mb-4 flex items-center gap-2 rounded-lg border border-err/30 bg-err/5 px-4 py-2 text-sm text-err"
 		>
+			<Icon name="alert" size={15} />
 			{m.monitor_unavailable()}
 		</p>
 	{/if}
 
 	<!-- stat tiles -->
 	<div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-		{#snippet tile(label: string, value: string)}
-			<div class="rounded-lg border border-edge bg-surface p-3">
-				<p class="text-xs text-ink-muted">{label}</p>
-				<p class="mt-1 text-2xl font-semibold text-ink">{value}</p>
+		{#snippet tile(icon: IconName, label: string, value: string)}
+			<div class="rounded-lg border border-edge bg-surface-2/60 p-3.5">
+				<p class="flex items-center gap-1.5 text-[11px] tracking-wide text-ink-muted uppercase">
+					<Icon name={icon} size={13} class="text-ink-dim" />
+					{label}
+				</p>
+				<p class="mt-1.5 font-mono text-2xl font-semibold text-ink tabular-nums">{value}</p>
 			</div>
 		{/snippet}
-		{@render tile(m.stat_qps(), (qpsHistory.at(-1) ?? 0)?.toFixed(1) ?? '—')}
-		{@render tile(m.stat_connections(), String(latest?.connections ?? '—'))}
-		{@render tile(m.stat_p95(), latest ? `${latest.latencyMs.p95} ms` : '—')}
+		{@render tile('zap', m.stat_qps(), (qpsHistory.at(-1) ?? 0)?.toFixed(1) ?? '—')}
+		{@render tile('link', m.stat_connections(), String(latest?.connections ?? '—'))}
+		{@render tile('clock', m.stat_p95(), latest ? `${latest.latencyMs.p95} ms` : '—')}
 		{@render tile(
+			'pulse',
 			m.stat_heap(),
 			latest?.heap.max ? `${Math.round((latest.heap.used / latest.heap.max) * 100)}%` : '—'
 		)}
@@ -158,8 +174,11 @@
 	</div>
 
 	<!-- running queries -->
-	<h2 class="mb-2 text-sm font-medium text-ink">{m.running_queries()}</h2>
-	<div class="mb-4 overflow-x-auto rounded-lg border border-edge">
+	<h2 class="mb-2 flex items-center gap-2 text-[13px] font-medium text-ink">
+		<Icon name="play" size={12} class="text-primary" />
+		{m.running_queries()}
+	</h2>
+	<div class="mb-5 overflow-x-auto rounded-lg border border-edge">
 		<table class="w-full text-left font-mono text-xs">
 			<thead class="bg-surface-2">
 				<tr>
@@ -187,10 +206,10 @@
 						</td>
 						<td class="px-3 py-1.5">
 							<button
-								class="rounded border border-edge px-2 py-0.5 text-ink-muted hover:text-ink"
-								style="border-color: var(--nebula-err)"
+								class="flex items-center gap-1 rounded-md border border-err/40 px-2 py-0.5 text-err transition hover:bg-err/10"
 								onclick={() => kill(str(query, 'QueryId'))}
 							>
+								<Icon name="ban" size={12} />
 								{m.kill()}
 							</button>
 						</td>
@@ -201,7 +220,10 @@
 	</div>
 
 	<!-- sessions -->
-	<h2 class="mb-2 text-sm font-medium text-ink">{m.sessions()}</h2>
+	<h2 class="mb-2 flex items-center gap-2 text-[13px] font-medium text-ink">
+		<Icon name="user" size={13} class="text-secondary" />
+		{m.sessions()}
+	</h2>
 	<div class="overflow-x-auto rounded-lg border border-edge">
 		<table class="w-full text-left font-mono text-xs">
 			<thead class="bg-surface-2">

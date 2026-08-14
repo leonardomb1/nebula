@@ -61,7 +61,7 @@
 	}
 </script>
 
-<figure class="rounded-lg border border-edge bg-surface p-3">
+<figure class="rounded-lg border border-edge bg-surface-2/60 p-3">
 	<figcaption class="mb-1 flex items-baseline justify-between text-xs">
 		<span class="font-medium text-ink">{title}</span>
 		{#if series.length > 1}

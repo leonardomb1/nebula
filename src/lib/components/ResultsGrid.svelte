@@ -25,46 +25,55 @@
 	bind:this={viewport}
 	bind:clientHeight={viewportHeight}
 	onscroll={() => (scrollTop = viewport?.scrollTop ?? 0)}
-	class="h-full overflow-auto font-mono text-xs"
+	class="h-full overflow-auto font-mono text-[12px]"
 >
 	<table class="border-separate border-spacing-0" style="min-width: 100%">
-		<thead class="sticky top-0 z-10">
+		<thead class="sticky top-0 z-20">
 			<tr>
-				<th class="w-12 border-r border-b border-edge bg-surface-2 px-2 text-right text-ink-muted">
+				<th
+					class="sticky left-0 z-30 w-12 border-r border-b border-edge bg-surface-2 px-2 text-right text-[11px] font-normal text-ink-dim"
+				>
 					#
 				</th>
 				{#each resultset.columns as column (column.name)}
 					<th
-						class="border-r border-b border-edge bg-surface-2 px-3 py-1 text-left font-medium whitespace-nowrap"
+						class="border-r border-b border-edge bg-surface-2 px-3 py-1.5 text-left font-medium whitespace-nowrap text-ink"
 					>
 						{column.name}
-						<span class="ml-1 font-normal text-ink-muted">{column.type}</span>
+						<span class="ml-1.5 text-[11px] font-normal tracking-wide text-ink-dim uppercase">
+							{column.type}
+						</span>
 					</th>
 				{/each}
+				<!-- filler: lets the real columns hug their content instead of stretching -->
+				<th class="w-full border-b border-edge bg-surface-2"></th>
 			</tr>
 		</thead>
 		<tbody>
 			<!-- spacer keeps the scrollbar honest while only ~a screen of rows exists -->
-			<tr style="height: {first * ROW_HEIGHT}px"><td colspan={resultset.columns.length + 1}></td></tr>
+			<tr style="height: {first * ROW_HEIGHT}px"><td colspan={resultset.columns.length + 2}></td></tr>
 			{#each slice as row, i (first + i)}
-				<tr class="hover:bg-surface-2/60" style="height: {ROW_HEIGHT}px">
-					<td class="border-r border-b border-edge/40 px-2 text-right text-ink-muted">
+				<tr class="group" style="height: {ROW_HEIGHT}px">
+					<td
+						class="sticky left-0 z-10 border-r border-b border-edge-soft bg-surface px-2 text-right text-[11px] text-ink-dim group-hover:bg-surface-2"
+					>
 						{first + i + 1}
 					</td>
 					{#each row as cell, c (c)}
 						<td
-							class="max-w-md truncate border-r border-b border-edge/40 px-3 whitespace-nowrap {cell ===
+							class="max-w-md truncate border-r border-b border-edge-soft px-3 whitespace-nowrap group-hover:bg-surface-2/50 {cell ===
 							null
-								? 'text-ink-muted italic'
+								? 'text-ink-dim italic'
 								: ''}"
 						>
 							{display(cell)}
 						</td>
 					{/each}
+					<td class="border-b border-edge-soft group-hover:bg-surface-2/50"></td>
 				</tr>
 			{/each}
 			<tr style="height: {Math.max(0, (resultset.rows.length - first - slice.length) * ROW_HEIGHT)}px">
-				<td colspan={resultset.columns.length + 1}></td>
+				<td colspan={resultset.columns.length + 2}></td>
 			</tr>
 		</tbody>
 	</table>

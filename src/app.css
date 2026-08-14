@@ -4,17 +4,27 @@
  * Nebula design tokens — the single source of truth for the palette.
  * Space-inspired: near-black indigo ground, violet primary, blue secondary.
  * Consumed by UI chrome, the Monaco theme, and dashboard charts.
+ *
+ * Elevation reads like an IDE: the chrome (activity bar, sidebar, tab strip,
+ * status bar) sits BELOW the content ground, so the editor and the result
+ * panes are the brightest surfaces on screen.
  */
 :root {
+	color-scheme: dark;
+
 	/* ground */
-	--nebula-bg: #0a0a14;
-	--nebula-surface: #12111f;
-	--nebula-surface-2: #1a1830;
-	--nebula-border: #2b2749;
+	--nebula-bg: #12111f; /* content: editor, results, plan, monitor */
+	--nebula-chrome: #0d0c17; /* chrome: activity bar, sidebar, tabs, status bar */
+	--nebula-surface: #0d0c17; /* alias of chrome — kept for existing usage */
+	--nebula-surface-2: #1a1830; /* raised: inputs, table headers, hover */
+	--nebula-surface-3: #232043; /* pressed / selected */
+	--nebula-border: #262242;
+	--nebula-border-soft: #1a1730;
 
 	/* ink */
 	--nebula-text: #e4e2f4;
 	--nebula-text-muted: #8f8ab3;
+	--nebula-text-dim: #6a6590;
 
 	/* accents */
 	--nebula-primary: #a78bfa; /* violet */
@@ -32,16 +42,70 @@
 	--color-bg: var(--nebula-bg);
 	--color-surface: var(--nebula-surface);
 	--color-surface-2: var(--nebula-surface-2);
+	--color-surface-3: var(--nebula-surface-3);
 	--color-edge: var(--nebula-border);
+	--color-edge-soft: var(--nebula-border-soft);
 	--color-ink: var(--nebula-text);
 	--color-ink-muted: var(--nebula-text-muted);
+	--color-ink-dim: var(--nebula-text-dim);
 	--color-primary: var(--nebula-primary);
 	--color-primary-strong: var(--nebula-primary-strong);
 	--color-secondary: var(--nebula-secondary);
 	--color-glow: var(--nebula-glow);
+	--color-ok: var(--nebula-ok);
+	--color-warn: var(--nebula-warn);
+	--color-err: var(--nebula-err);
+
+	--font-sans:
+		ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--font-mono:
+		ui-monospace, 'JetBrains Mono', 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 }
 
 body {
 	background: var(--nebula-bg);
 	color: var(--nebula-text);
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+::selection {
+	background: color-mix(in oklab, var(--nebula-primary-strong) 45%, transparent);
+	color: #fff;
+}
+
+/* Thin overlay scrollbars, IDE-style — Monaco paints its own. */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--nebula-surface-3) transparent;
+}
+::-webkit-scrollbar {
+	width: 11px;
+	height: 11px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: var(--nebula-surface-3);
+	background-clip: padding-box;
+	border: 3px solid transparent;
+	border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: #35305e;
+	background-clip: padding-box;
+}
+
+:focus-visible {
+	outline: 1px solid var(--nebula-primary);
+	outline-offset: -1px;
+}
+
+/* Chrome is furniture: it never gets a text cursor or a stray selection. */
+.chrome {
+	user-select: none;
+	cursor: default;
 }

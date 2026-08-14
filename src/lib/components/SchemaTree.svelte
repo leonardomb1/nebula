@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages';
 	import type { TableInfo } from '$lib/workbench.svelte';
+	import Icon from './Icon.svelte';
 
 	let {
 		databases,
@@ -22,55 +23,76 @@
 		expandedDbs[db] = !expandedDbs[db];
 		if (expandedDbs[db]) loadTables(db);
 	}
+
+	/** One row of the tree — 22px, full-bleed hover, VS Code density. */
+	const ROW =
+		'group flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-[13px] transition hover:bg-surface-2';
 </script>
 
-<nav class="h-full overflow-auto p-2 text-sm" aria-label={m.explorer()}>
-	<p class="px-2 pb-2 text-xs font-medium tracking-wider text-ink-muted uppercase">
+<nav class="flex h-full flex-col overflow-hidden" aria-label={m.explorer()}>
+	<header class="flex h-9 shrink-0 items-center px-4 text-[11px] font-semibold tracking-widest text-ink-muted uppercase">
 		{m.explorer()}
-	</p>
-	<ul>
+	</header>
+
+	<ul class="min-h-0 flex-1 overflow-auto pb-2">
 		{#each databases as db (db)}
 			{@const tables = tablesByDb[db]}
 			<li>
-				<button
-					class="flex w-full items-center gap-1 rounded px-2 py-0.5 text-left hover:bg-surface-2"
-					onclick={() => toggleDb(db)}
-				>
-					<span class="inline-block w-3 text-ink-muted">{expandedDbs[db] ? '▾' : '▸'}</span>
+				<button class="{ROW} pl-1.5" onclick={() => toggleDb(db)}>
+					<Icon
+						name={expandedDbs[db] ? 'chevron-down' : 'chevron-right'}
+						size={12}
+						class="text-ink-dim"
+					/>
+					<Icon name="explorer" size={14} class="text-primary" />
 					<span class="truncate">{db}</span>
 				</button>
+
 				{#if expandedDbs[db]}
-					<ul class="ml-4 border-l border-edge/60 pl-1">
+					<ul class="relative before:absolute before:top-0 before:bottom-0 before:left-[13px] before:w-px before:bg-edge-soft">
 						{#if tables === 'loading'}
-							<li class="px-2 py-0.5 text-xs text-ink-muted">{m.loading()}</li>
+							<li class="flex items-center gap-1.5 py-1 pl-8 text-xs text-ink-dim">
+								<Icon name="spinner" size={12} class="animate-spin" />
+								{m.loading()}
+							</li>
 						{:else if tables === 'error'}
-							<li class="px-2 py-0.5 text-xs" style="color: var(--nebula-err)">
+							<li class="flex items-center gap-1.5 py-1 pl-8 text-xs text-err">
+								<Icon name="alert" size={12} />
 								{m.schema_error()}
 							</li>
 						{:else if Array.isArray(tables)}
 							{#if tables.length === 0}
-								<li class="px-2 py-0.5 text-xs text-ink-muted italic">{m.schema_empty()}</li>
+								<li class="py-1 pl-8 text-xs text-ink-dim italic">{m.schema_empty()}</li>
 							{/if}
 							{#each tables as table (table.name)}
 								{@const key = `${db}.${table.name}`}
 								<li>
 									<button
-										class="flex w-full items-center gap-1 rounded px-2 py-0.5 text-left hover:bg-surface-2"
+										class="{ROW} pl-5"
 										onclick={() => (expandedTables[key] = !expandedTables[key])}
 										ondblclick={() => onInsert?.(`\`${db}\`.\`${table.name}\``)}
 										title={key}
 									>
-										<span class="inline-block w-3 text-ink-muted">
-											{expandedTables[key] ? '▾' : '▸'}
-										</span>
-										<span class="truncate text-secondary">{table.name}</span>
+										<Icon
+											name={expandedTables[key] ? 'chevron-down' : 'chevron-right'}
+											size={12}
+											class="text-ink-dim"
+										/>
+										<Icon name="table" size={14} class="text-secondary" />
+										<span class="truncate">{table.name}</span>
 									</button>
+
 									{#if expandedTables[key]}
-										<ul class="ml-4 border-l border-edge/60 pl-1">
+										<ul>
 											{#each table.columns as column (column.name)}
-												<li class="flex justify-between gap-2 px-2 py-0.5 font-mono text-xs">
+												<li
+													class="flex items-center gap-1.5 py-[3px] pr-2 pl-[38px] text-[12px] hover:bg-surface-2"
+												>
+													<Icon name="column" size={13} class="text-ink-dim" />
 													<span class="truncate">{column.name}</span>
-													<span class="shrink-0 text-ink-muted">{column.type}</span>
+													<span class="ml-auto shrink-0 font-mono text-[11px] text-ink-dim">
+														{column.type}
+													</span>
 												</li>
 											{/each}
 										</ul>
