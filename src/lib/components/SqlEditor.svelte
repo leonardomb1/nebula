@@ -6,6 +6,7 @@
 		value = $bindable(''),
 		onRun,
 		onSave,
+		onSearch,
 		completions
 	}: {
 		value?: string;
@@ -13,6 +14,8 @@
 		onRun?: (sql: string) => void;
 		/** Ctrl/Cmd+S — bound inside Monaco so it fires while typing. */
 		onSave?: () => void;
+		/** Ctrl/Cmd+K — Monaco owns that chord by default, so take it back. */
+		onSearch?: () => void;
 		/** Live schema context for autocomplete. */
 		completions?: () => SchemaCompletionContext;
 	} = $props();
@@ -66,6 +69,7 @@
 			});
 
 			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSave?.());
+			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => onSearch?.());
 		})();
 
 		return () => {

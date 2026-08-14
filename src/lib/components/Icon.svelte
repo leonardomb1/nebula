@@ -30,9 +30,13 @@
 		pencil: '<path d="M12.5 20H21"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z"/>',
 		dot: '<path d="M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z" fill="currentColor" stroke="none"/>',
 		spinner: '<path d="M12 3a9 9 0 1 0 9 9"/>',
+		refresh:
+			'<path d="M20.5 12a8.5 8.5 0 0 1-14.6 5.9L3.5 15.5"/><path d="M3.5 12a8.5 8.5 0 0 1 14.6-5.9L20.5 8.5"/><path d="M20.5 4v4.5H16"/><path d="M3.5 20v-4.5H8"/>',
 
 		// tree / data
 		'chevron-right': '<path d="m9.5 5 7 7-7 7"/>',
+		'arrow-up': '<path d="M12 20V5"/><path d="m6 11 6-6 6 6"/>',
+		'arrow-down': '<path d="M12 4v15"/><path d="m6 13 6 6 6-6"/>',
 		'chevron-down': '<path d="m5 9.5 7 7 7-7"/>',
 		table:
 			'<path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 10h16"/><path d="M10 10v10"/>',

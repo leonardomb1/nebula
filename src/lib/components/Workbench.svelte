@@ -3,6 +3,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { Workbench } from '$lib/workbench.svelte';
 	import Icon from './Icon.svelte';
+	import CommandPalette from './CommandPalette.svelte';
 	import QueryFiles from './QueryFiles.svelte';
 	import SqlEditor from './SqlEditor.svelte';
 	import ResultsGrid from './ResultsGrid.svelte';
@@ -16,7 +17,8 @@
 
 	let sidebarWidth = $state(260);
 	let resultsHeight = $state(280);
-	let view = $state<'editor' | 'monitor'>('editor');
+	/** Activity bar selection — each view owns the sidebar, like VS Code. */
+	let view = $state<'databases' | 'files' | 'monitor'>('databases');
 
 	/** Shared chrome button geometry — one place, so the toolbar stays even. */
 	const BTN = 'flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] transition';
@@ -28,13 +30,34 @@
 		void workbench.loadFiles();
 	});
 
-	/** Ctrl/Cmd+S anywhere outside the editor — SqlEditor binds its own. */
+	let palette = $state(false);
+
+	/** Ctrl/Cmd+S and Ctrl/Cmd+K — SqlEditor binds the same two inside Monaco. */
 	function onKeydown(event: KeyboardEvent): void {
-		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+		if (!(event.ctrlKey || event.metaKey)) return;
+		const key = event.key.toLowerCase();
+		if (key === 's') {
 			event.preventDefault();
 			const tab = workbench.activeTab;
 			if (tab) void workbench.saveTab(tab);
+		} else if (key === 'k') {
+			event.preventDefault();
+			palette = true;
 		}
+	}
+
+	function insertIntoEditor(text: string): void {
+		const tab = workbench.activeTab ?? workbench.newTab(m.tab_title());
+		tab.sql += (tab.sql && !tab.sql.endsWith(' ') ? ' ' : '') + text;
+	}
+
+	/** Context-menu peek at a table: its own tab, run straight away. */
+	function selectTop(db: string, table: string): void {
+		const tab = workbench.newTab(table);
+		tab.database = db;
+		tab.sql = `SELECT * FROM \`${db}\`.\`${table}\` LIMIT 100;`;
+		tab.savedSql = tab.sql;
+		void tab.execute();
 	}
 
 	/** Closing a tab with unsaved text asks first — there is no undo for it. */
@@ -79,7 +102,11 @@
 	}
 </script>
 
-{#snippet activityItem(icon: 'explorer' | 'pulse', label: string, target: 'editor' | 'monitor')}
+{#snippet activityItem(
+	icon: 'explorer' | 'query' | 'pulse',
+	label: string,
+	target: typeof view
+)}
 	{@const active = view === target}
 	<button
 		class="relative flex h-10 w-12 items-center justify-center transition {active
@@ -99,12 +126,31 @@
 
 <svelte:window onkeydown={onKeydown} />
 
+{#if palette}
+	<CommandPalette
+		files={workbench.files}
+		onclose={() => (palette = false)}
+		onOpenFile={(name) => {
+			view = 'files';
+			void workbench.openFile(name);
+		}}
+		onUseDatabase={(db) => {
+			const tab = workbench.activeTab ?? workbench.newTab(m.tab_title());
+			tab.database = db;
+			if (!workbench.databases.includes(db)) workbench.databases.push(db);
+		}}
+		onSelectTop={selectTop}
+		onInsert={insertIntoEditor}
+	/>
+{/if}
+
 <div class="flex h-screen flex-col overflow-hidden">
 	<div class="flex min-h-0 flex-1">
 		<!-- activity bar -->
 		<aside class="chrome flex w-12 shrink-0 flex-col items-center border-r border-edge bg-surface">
 			<img src="/favicon.svg" alt="" class="my-2.5 h-6 w-6" title="Nebula" />
-			{@render activityItem('explorer', m.explorer(), 'editor')}
+			{@render activityItem('explorer', m.databases(), 'databases')}
+			{@render activityItem('query', m.queries(), 'files')}
 			{@render activityItem('pulse', m.monitor(), 'monitor')}
 			<a
 				href="/auth/logout"
@@ -122,36 +168,61 @@
 				<Monitor />
 			</div>
 		{:else}
-			<!-- sidebar -->
+			<!-- sidebar: one panel per activity-bar view -->
 			<aside
 				class="chrome flex shrink-0 flex-col overflow-hidden bg-surface"
 				style="width: {sidebarWidth}px"
 			>
-				<header
-					class="flex h-9 shrink-0 items-center px-4 text-[11px] font-semibold tracking-widest text-ink-muted uppercase"
-				>
-					{m.explorer()}
+				<header class="flex h-9 shrink-0 items-center gap-1 pr-1.5 pl-4">
+					<span
+						class="min-w-0 flex-1 truncate text-[11px] font-semibold tracking-widest text-ink-muted uppercase"
+					>
+						{view === 'files' ? m.queries() : m.databases()}
+					</span>
+					{#if view === 'files'}
+						<button
+							class="flex h-6 w-6 items-center justify-center rounded text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+							title={m.new_query()}
+							aria-label={m.new_query()}
+							onclick={() => void workbench.saveTab(workbench.newTab(m.tab_title()))}
+						>
+							<Icon name="plus" size={15} />
+						</button>
+					{:else}
+						<button
+							class="flex h-6 w-6 items-center justify-center rounded text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+							title={m.refresh()}
+							aria-label={m.refresh()}
+							onclick={() => void workbench.refreshSchema()}
+						>
+							<Icon name="refresh" size={14} />
+						</button>
+					{/if}
 				</header>
 
-				<QueryFiles
-					files={workbench.files}
-					activeFile={workbench.activeTab?.fileName ?? null}
-					bind:renaming={workbench.renaming}
-					onOpen={(name) => void workbench.openFile(name)}
-					onNew={() => void workbench.saveTab(workbench.newTab(m.tab_title()))}
-					onRename={(from, to) => void workbench.renameFile(from, to)}
-					onDelete={(name) => void workbench.deleteFile(name)}
-				/>
-
-				<SchemaTree
-					databases={workbench.databases}
-					tablesByDb={workbench.tablesByDb}
-					loadTables={(db) => void workbench.loadTables(db)}
-					onInsert={(text) => {
-						const tab = workbench.activeTab;
-						if (tab) tab.sql += (tab.sql && !tab.sql.endsWith(' ') ? ' ' : '') + text;
-					}}
-				/>
+				{#if view === 'files'}
+					<QueryFiles
+						files={workbench.files}
+						activeFile={workbench.activeTab?.fileName ?? null}
+						bind:renaming={workbench.renaming}
+						onOpen={(name) => void workbench.openFile(name)}
+						onRename={(from, to) => void workbench.renameFile(from, to)}
+						onDelete={(name) => void workbench.deleteFile(name)}
+					/>
+				{:else}
+					<SchemaTree
+						databases={workbench.databases}
+						tablesByDb={workbench.tablesByDb}
+						loadTables={(db) => void workbench.loadTables(db)}
+						onInsert={insertIntoEditor}
+						onRefresh={() => void workbench.refreshSchema()}
+						onUseDatabase={(db) => {
+							const tab = workbench.activeTab ?? workbench.newTab(m.tab_title());
+							tab.database = db;
+						}}
+						onSelectTop={selectTop}
+					/>
+				{/if}
 			</aside>
 			<div
 				role="separator"
@@ -301,10 +372,20 @@
 							{m.profile_toggle()}
 						</button>
 
-						<span class="ml-auto text-[11px] text-ink-dim" title={m.run_hint()}>
-							<kbd class="rounded border border-edge bg-surface-2 px-1.5 py-0.5 font-sans"
-								>Ctrl+Enter</kbd
+						<span class="ml-auto flex items-center gap-2">
+							<span class="text-[11px] text-ink-dim" title={m.run_hint()}>
+								<kbd class="rounded border border-edge bg-surface-2 px-1.5 py-0.5 font-sans"
+									>Ctrl+Enter</kbd
+								>
+							</span>
+							<button
+								class="{GHOST} min-w-40 justify-start gap-2 border border-edge"
+								onclick={() => (palette = true)}
 							>
+								<Icon name="search" size={13} />
+								<span class="truncate">{m.search_placeholder()}</span>
+								<kbd class="ml-auto rounded border border-edge px-1 text-[10px]">Ctrl+K</kbd>
+							</button>
 						</span>
 					</div>
 
@@ -314,6 +395,7 @@
 							bind:value={tab.sql}
 							onRun={(sql) => tab.execute(sql)}
 							onSave={() => void workbench.saveTab(tab)}
+							onSearch={() => (palette = true)}
 							completions={() => ({
 								databases: workbench.databases,
 								database: workbench.activeTab?.database ?? null,

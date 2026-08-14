@@ -311,6 +311,12 @@ export class Workbench {
 		this.tablesByDb[db] = tables;
 	}
 
+	/** Drops the schema cache and refetches; the tree refills what is expanded. */
+	async refreshSchema(): Promise<void> {
+		this.tablesByDb = {};
+		await this.loadDatabases();
+	}
+
 	// --- saved queries -----------------------------------------------------
 
 	async loadFiles(): Promise<void> {

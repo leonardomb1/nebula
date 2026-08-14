@@ -32,6 +32,9 @@
 	--nebula-secondary: #60a5fa; /* blue */
 	--nebula-glow: #c4b5fd;
 
+	/* grid selection — a tint you can read straight through, plus its border */
+	--nebula-select: #8b5cf626;
+
 	/* signals */
 	--nebula-ok: #34d399;
 	--nebula-warn: #fbbf24;
@@ -52,6 +55,7 @@
 	--color-primary-strong: var(--nebula-primary-strong);
 	--color-secondary: var(--nebula-secondary);
 	--color-glow: var(--nebula-glow);
+	--color-select: var(--nebula-select);
 	--color-ok: var(--nebula-ok);
 	--color-warn: var(--nebula-warn);
 	--color-err: var(--nebula-err);
