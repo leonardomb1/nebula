@@ -3,6 +3,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { Workbench } from '$lib/workbench.svelte';
 	import Icon from './Icon.svelte';
+	import QueryFiles from './QueryFiles.svelte';
 	import SqlEditor from './SqlEditor.svelte';
 	import ResultsGrid from './ResultsGrid.svelte';
 	import SchemaTree from './SchemaTree.svelte';
@@ -24,7 +25,23 @@
 	onMount(() => {
 		workbench.newTab(m.tab_title());
 		void workbench.loadDatabases();
+		void workbench.loadFiles();
 	});
+
+	/** Ctrl/Cmd+S anywhere outside the editor — SqlEditor binds its own. */
+	function onKeydown(event: KeyboardEvent): void {
+		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+			event.preventDefault();
+			const tab = workbench.activeTab;
+			if (tab) void workbench.saveTab(tab);
+		}
+	}
+
+	/** Closing a tab with unsaved text asks first — there is no undo for it. */
+	function closeTab(tab: NonNullable<typeof workbench.activeTab>): void {
+		if (tab.dirty && tab.sql.trim() && !confirm(m.discard_confirm({ name: tab.title }))) return;
+		workbench.closeTab(tab);
+	}
 
 	function startDrag(event: PointerEvent, axis: 'x' | 'y'): void {
 		event.preventDefault();
@@ -80,6 +97,8 @@
 	</button>
 {/snippet}
 
+<svelte:window onkeydown={onKeydown} />
+
 <div class="flex h-screen flex-col overflow-hidden">
 	<div class="flex min-h-0 flex-1">
 		<!-- activity bar -->
@@ -104,7 +123,26 @@
 			</div>
 		{:else}
 			<!-- sidebar -->
-			<aside class="chrome shrink-0 bg-surface" style="width: {sidebarWidth}px">
+			<aside
+				class="chrome flex shrink-0 flex-col overflow-hidden bg-surface"
+				style="width: {sidebarWidth}px"
+			>
+				<header
+					class="flex h-9 shrink-0 items-center px-4 text-[11px] font-semibold tracking-widest text-ink-muted uppercase"
+				>
+					{m.explorer()}
+				</header>
+
+				<QueryFiles
+					files={workbench.files}
+					activeFile={workbench.activeTab?.fileName ?? null}
+					bind:renaming={workbench.renaming}
+					onOpen={(name) => void workbench.openFile(name)}
+					onNew={() => void workbench.saveTab(workbench.newTab(m.tab_title()))}
+					onRename={(from, to) => void workbench.renameFile(from, to)}
+					onDelete={(name) => void workbench.deleteFile(name)}
+				/>
+
 				<SchemaTree
 					databases={workbench.databases}
 					tablesByDb={workbench.tablesByDb}
@@ -152,13 +190,23 @@
 									<span class="truncate">{tab.title}</span>
 								</button>
 								<button
-									class="mr-1.5 flex h-5 w-5 items-center justify-center rounded text-ink-muted opacity-0 transition group-hover:opacity-100 hover:bg-surface-3 hover:text-ink {active
-										? 'opacity-70'
-										: ''}"
-									onclick={() => workbench.closeTab(tab)}
+									class="mr-1.5 flex h-5 w-5 items-center justify-center rounded text-ink-muted transition hover:bg-surface-3 hover:text-ink {tab.dirty ||
+									active
+										? ''
+										: 'opacity-0 group-hover:opacity-100'}"
+									onclick={() => closeTab(tab)}
+									title={tab.dirty ? m.unsaved() : m.close_tab()}
 									aria-label={m.close_tab()}
 								>
-									<Icon name="close" size={13} />
+									<!-- unsaved shows a dot until you reach for it, like VS Code -->
+									<Icon
+										name={tab.dirty ? 'dot' : 'close'}
+										size={tab.dirty ? 11 : 13}
+										class={tab.dirty ? 'text-primary group-hover:hidden' : ''}
+									/>
+									{#if tab.dirty}
+										<Icon name="close" size={13} class="hidden group-hover:block" />
+									{/if}
 								</button>
 							</div>
 						{/each}
@@ -185,11 +233,17 @@
 								size={13}
 								class="pointer-events-none absolute left-2 text-ink-dim"
 							/>
+							<!-- there is no "no database" choice: a query always runs somewhere -->
 							<select
-								class="h-7 appearance-none rounded-md border border-edge bg-surface-2 py-0 pr-6 pl-7 text-[12px] text-ink transition hover:border-primary-strong/60"
+								class="h-7 appearance-none rounded-md border border-edge bg-surface-2 py-0 pr-6 pl-7 text-[12px] text-ink transition hover:border-primary-strong/60 disabled:opacity-50"
 								bind:value={tab.database}
+								disabled={workbench.databases.length === 0}
 							>
-								<option value={null}>{m.no_database()}</option>
+								{#if workbench.databases.length === 0}
+									<option value={null}>
+										{workbench.databasesFailed ? m.schema_error() : m.loading()}
+									</option>
+								{/if}
 								{#each workbench.databases as db (db)}
 									<option value={db}>{db}</option>
 								{/each}
@@ -227,6 +281,16 @@
 						<span class="mx-1 h-4 w-px bg-edge"></span>
 
 						<button
+							class={GHOST}
+							disabled={tab.fileName ? !tab.dirty : !tab.sql.trim()}
+							title="{m.save()} — Ctrl+S"
+							onclick={() => void workbench.saveTab(tab)}
+						>
+							<Icon name="save" size={13} />
+							{m.save()}
+						</button>
+
+						<button
 							class="{BTN} {tab.profileEnabled
 								? 'bg-surface-3 text-primary'
 								: 'text-ink-muted hover:bg-surface-2 hover:text-ink'}"
@@ -249,6 +313,7 @@
 						<SqlEditor
 							bind:value={tab.sql}
 							onRun={(sql) => tab.execute(sql)}
+							onSave={() => void workbench.saveTab(tab)}
 							completions={() => ({
 								databases: workbench.databases,
 								database: workbench.activeTab?.database ?? null,

@@ -24,6 +24,11 @@
 		ban: '<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/><path d="m5.64 5.64 12.72 12.72"/>',
 		search: '<path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z"/><path d="m20 20-3.5-3.5"/>',
 		'arrow-right': '<path d="M4 12h15"/><path d="m13 6 6 6-6 6"/>',
+		save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h7"/>',
+		trash:
+			'<path d="M4 7h16"/><path d="M9 7V4.5A.5.5 0 0 1 9.5 4h5a.5.5 0 0 1 .5.5V7"/><path d="M6.5 7 7.6 20a1 1 0 0 0 1 .9h6.8a1 1 0 0 0 1-.9L17.5 7"/><path d="M10.5 11.5v5"/><path d="M13.5 11.5v5"/>',
+		pencil: '<path d="M12.5 20H21"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z"/>',
+		dot: '<path d="M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z" fill="currentColor" stroke="none"/>',
 		spinner: '<path d="M12 3a9 9 0 1 0 9 9"/>',
 
 		// tree / data
@@ -43,6 +48,8 @@
 		inbox:
 			'<path d="M4 13h4l2 3h4l2-3h4"/><path d="M6.5 4h11l2.5 9v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/>',
 		clock: '<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/><path d="M12 7v5l3 2"/>',
+		calendar:
+			'<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v10a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z"/><path d="M4 10h16"/><path d="M8 3v4"/><path d="M16 3v4"/>',
 		check: '<path d="m4.5 12.5 5 5 10-11"/>',
 		link: '<path d="M9 15 15 9"/><path d="M11 6.5 12.6 5a4.6 4.6 0 0 1 6.5 6.5L17.5 13"/><path d="M13 17.5 11.4 19a4.6 4.6 0 0 1-6.5-6.5L6.5 11"/>'
 	} as const;

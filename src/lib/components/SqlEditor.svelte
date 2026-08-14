@@ -5,11 +5,14 @@
 	let {
 		value = $bindable(''),
 		onRun,
+		onSave,
 		completions
 	}: {
 		value?: string;
 		/** Called with the selection when there is one, else the whole buffer. */
 		onRun?: (sql: string) => void;
+		/** Ctrl/Cmd+S — bound inside Monaco so it fires while typing. */
+		onSave?: () => void;
 		/** Live schema context for autocomplete. */
 		completions?: () => SchemaCompletionContext;
 	} = $props();
@@ -61,6 +64,8 @@
 					selection && !selection.isEmpty() ? model?.getValueInRange(selection) : null;
 				onRun?.(selected?.trim() || editor!.getValue());
 			});
+
+			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSave?.());
 		})();
 
 		return () => {
