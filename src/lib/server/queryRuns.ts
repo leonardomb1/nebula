@@ -40,6 +40,8 @@ export interface QueryRun {
 	sql: string;
 	database: string | null;
 	profile: boolean;
+	/** Rows kept per statement — the client's request, clamped by MAX_ROWS. */
+	maxRows: number;
 	status: RunStatus;
 	startedAt: number;
 	endedAt: number | null;
@@ -152,7 +154,7 @@ function runStatement(
 			rowCount++;
 			batch.push((row as unknown[]).map(jsonSafe));
 			if (batch.length >= ROW_BATCH) flush();
-			if (rowCount >= MAX_ROWS) {
+			if (rowCount >= run.maxRows) {
 				truncated = true;
 				// Stop the server-side query too; destroying just the socket would
 				// leave it running to completion in the warehouse.
@@ -234,7 +236,8 @@ export function startRun(
 	username: string,
 	sql: string,
 	database: string | null,
-	profile = false
+	profile = false,
+	maxRows?: number
 ): QueryRun {
 	const run: QueryRun = {
 		id: randomUUID(),
@@ -242,6 +245,8 @@ export function startRun(
 		sql,
 		database,
 		profile,
+		// A client asking for more than the deployment allows still gets MAX_ROWS.
+		maxRows: Math.min(MAX_ROWS, Math.max(1, Math.floor(maxRows ?? MAX_ROWS))),
 		status: 'running',
 		startedAt: Date.now(),
 		endedAt: null,

@@ -6,6 +6,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		sql?: string;
 		database?: string;
 		profile?: boolean;
+		maxRows?: number;
 	} | null;
 
 	const sql = body?.sql?.trim();
@@ -15,7 +16,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		locals.user!.username,
 		sql,
 		body?.database?.trim() || null,
-		body?.profile === true
+		body?.profile === true,
+		Number.isFinite(body?.maxRows) ? Number(body?.maxRows) : undefined
 	);
 	return json({ runId: run.id }, { status: 202 });
 };

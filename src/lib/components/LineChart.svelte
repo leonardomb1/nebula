@@ -61,9 +61,9 @@
 	}
 </script>
 
-<figure class="rounded-lg border border-edge bg-surface p-3">
-	<figcaption class="mb-1 flex items-baseline justify-between text-xs">
-		<span class="font-medium text-ink">{title}</span>
+<figure class="nb-glass p-3.5">
+	<figcaption class="mb-1.5 flex items-baseline justify-between text-[11.5px]">
+		<span class="font-semibold">{title}</span>
 		{#if series.length > 1}
 			<span class="flex gap-3">
 				{#each series as s (s.label)}
@@ -75,7 +75,6 @@
 			</span>
 		{/if}
 	</figcaption>
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<svg
 		viewBox="0 0 {W} {H}"
 		class="w-full"
@@ -91,7 +90,7 @@
 				x2={W - PAD.right}
 				y1={PAD.top + f * (H - PAD.top - PAD.bottom)}
 				y2={PAD.top + f * (H - PAD.top - PAD.bottom)}
-				stroke="var(--nebula-border)"
+				stroke="var(--nb-line)"
 				stroke-width="0.5"
 				opacity="0.6"
 			/>
@@ -105,7 +104,7 @@
 					x={W - PAD.right + 4}
 					y={y(last) + 3}
 					font-size="10"
-					fill="var(--nebula-text-muted)"
+					fill="var(--nb-ink-muted)"
 				>
 					{series.length > 1 ? `${s.label} ` : ''}{format(last)}
 				</text>
@@ -118,27 +117,27 @@
 				x2={x(hoverIndex)}
 				y1={PAD.top}
 				y2={H - PAD.bottom}
-				stroke="var(--nebula-text-muted)"
+				stroke="var(--nb-ink-muted)"
 				stroke-width="1"
 				stroke-dasharray="3 3"
 			/>
 			{#each series as s (s.label)}
 				{@const v = s.values[hoverIndex]}
 				{#if v !== null && v !== undefined}
-					<circle cx={x(hoverIndex)} cy={y(v)} r="3.5" fill={s.color} stroke="var(--nebula-surface)" stroke-width="2" />
+					<circle cx={x(hoverIndex)} cy={y(v)} r="3.5" fill={s.color} stroke="var(--nb-bg)" stroke-width="2" />
 				{/if}
 			{/each}
 		{/if}
 
-		<text x={PAD.left} y={H - 4} font-size="9" fill="var(--nebula-text-muted)">
+		<text x={PAD.left} y={H - 4} font-size="9" fill="var(--nb-ink-muted)">
 			{times.length ? timeLabel(times[0]) : ''}
 		</text>
-		<text x={W - PAD.right} y={H - 4} font-size="9" text-anchor="end" fill="var(--nebula-text-muted)">
+		<text x={W - PAD.right} y={H - 4} font-size="9" text-anchor="end" fill="var(--nb-ink-muted)">
 			{times.length ? timeLabel(times[times.length - 1]) : ''}
 		</text>
 	</svg>
 	{#if hoverIndex !== null && times[hoverIndex] !== undefined}
-		<div class="mt-1 flex gap-3 font-mono text-xs text-ink-muted">
+		<div class="mt-1.5 flex gap-3 font-mono text-[11px] text-ink-muted">
 			<span>{timeLabel(times[hoverIndex])}</span>
 			{#each series as s (s.label)}
 				{@const v = s.values[hoverIndex]}

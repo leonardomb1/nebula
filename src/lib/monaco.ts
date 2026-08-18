@@ -9,34 +9,101 @@ self.MonacoEnvironment = {
 	getWorker: () => new EditorWorker()
 };
 
-/** The Nebula theme, mapped from the design tokens in app.css. */
-monaco.editor.defineTheme('nebula-dark', {
-	base: 'vs-dark',
-	inherit: true,
-	rules: [
-		{ token: 'keyword.sql', foreground: 'a78bfa', fontStyle: 'bold' },
-		{ token: 'string.sql', foreground: '7dd3a7' },
-		{ token: 'number.sql', foreground: 'fbbf24' },
-		{ token: 'comment', foreground: '8f8ab3', fontStyle: 'italic' },
-		{ token: 'operator.sql', foreground: '60a5fa' },
-		{ token: 'predefined.sql', foreground: '60a5fa' }
-	],
-	colors: {
-		'editor.background': '#12111f',
-		'editor.foreground': '#e4e2f4',
-		'editor.lineHighlightBackground': '#1a183055',
-		'editor.selectionBackground': '#8b5cf655',
-		'editorLineNumber.foreground': '#8f8ab3',
-		'editorLineNumber.activeForeground': '#c4b5fd',
-		'editorCursor.foreground': '#c4b5fd',
-		'editorWidget.background': '#1a1830',
-		'editorWidget.border': '#2b2749',
-		'editorSuggestWidget.selectedBackground': '#8b5cf633',
-		'input.background': '#12111f',
-		'scrollbarSlider.background': '#2b274988',
-		'scrollbarSlider.hoverBackground': '#2b2749'
+/**
+ * The two Aurora editor themes, mapped from the design tokens in app.css.
+ *
+ * Both grounds are fully transparent so the glass panel — and the aurora
+ * blooms behind it — show through the code, which is the whole point of the
+ * design. Roles are consistent across themes: keywords carry the accent,
+ * numbers run warm, strings run green.
+ */
+function auroraTheme(
+	base: 'vs' | 'vs-dark',
+	c: {
+		keyword: string;
+		string: string;
+		number: string;
+		comment: string;
+		operator: string;
+		ink: string;
+		muted: string;
+		faint: string;
+		accent: string;
+		widget: string;
+		border: string;
 	}
-});
+): monaco.editor.IStandaloneThemeData {
+	return {
+		base,
+		inherit: true,
+		rules: [
+			{ token: 'keyword.sql', foreground: c.keyword, fontStyle: 'bold' },
+			{ token: 'operator.sql', foreground: c.operator },
+			{ token: 'predefined.sql', foreground: c.keyword },
+			{ token: 'string.sql', foreground: c.string },
+			{ token: 'number.sql', foreground: c.number },
+			{ token: 'comment', foreground: c.comment, fontStyle: 'italic' }
+		],
+		colors: {
+			'editor.background': '#00000000',
+			'editor.foreground': c.ink,
+			'editor.lineHighlightBackground': c.accent + '14',
+			'editor.selectionBackground': c.accent + '3d',
+			'editorLineNumber.foreground': c.faint,
+			'editorLineNumber.activeForeground': c.muted,
+			'editorCursor.foreground': c.accent,
+			'editorIndentGuide.background1': c.border,
+			'editorWidget.background': c.widget,
+			'editorWidget.border': c.border,
+			'editorSuggestWidget.background': c.widget,
+			'editorSuggestWidget.selectedBackground': c.accent + '33',
+			'editorHoverWidget.background': c.widget,
+			'input.background': c.widget,
+			'minimap.background': '#00000000',
+			'scrollbarSlider.background': c.border,
+			'scrollbarSlider.hoverBackground': c.faint
+		}
+	};
+}
+
+monaco.editor.defineTheme(
+	'aurora-dark',
+	auroraTheme('vs-dark', {
+		keyword: 'ff9783',
+		string: '9ec9a8',
+		number: 'ffd7a1',
+		comment: 'bda8a2',
+		operator: 'c8b6b1',
+		ink: 'f4eeec',
+		muted: 'c8b6b1',
+		faint: '8b7671',
+		accent: 'ff563c',
+		widget: '#1a1211',
+		border: '#ffffff1f'
+	})
+);
+
+monaco.editor.defineTheme(
+	'aurora-light',
+	auroraTheme('vs', {
+		keyword: 'ae1800',
+		string: '1f6b52',
+		number: '9a6212',
+		comment: '8a8480',
+		operator: '6d6866',
+		ink: '201e1d',
+		muted: '6d6866',
+		faint: '9c9694',
+		accent: 'ec3013',
+		widget: '#fffdfc',
+		border: '#201e1d1f'
+	})
+);
+
+/** Picks the editor theme that matches the resolved app theme. */
+export function editorTheme(resolved: 'light' | 'dark'): string {
+	return resolved === 'light' ? 'aurora-light' : 'aurora-dark';
+}
 
 // ---------------------------------------------------------------------------
 // Schema-aware SQL completions. The provider is language-global in Monaco, so

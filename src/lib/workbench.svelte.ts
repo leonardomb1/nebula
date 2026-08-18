@@ -1,5 +1,7 @@
 /** Workbench state (Svelte 5 runes) + the client side of the query API. */
 
+import { settings } from './settings.svelte';
+
 export interface ColumnMeta {
 	name: string;
 	type: string;
@@ -101,7 +103,8 @@ export class Tab {
 			body: JSON.stringify({
 				sql,
 				database: this.database ?? undefined,
-				profile: this.profileEnabled
+				profile: this.profileEnabled,
+				maxRows: settings.rowLimit
 			})
 		}).catch(() => null);
 
@@ -160,6 +163,9 @@ export class Tab {
 					set.truncated = event.truncated;
 					set.finished = true;
 					set.queryId = event.queryId ?? null;
+					// The profile only exists for a run that asked for it; when the
+					// user wants the plan up front, fetch it as soon as it can exist.
+					if (settings.planFirst && set.queryId) void this.loadProfile(set.queryId);
 					break;
 				}
 				case 'error':
@@ -257,6 +263,7 @@ export class Workbench {
 		const tab = new Tab(`${baseTitle} ${this.tabs.length + 1}`);
 		// New tabs inherit the current database — the IDE-feel default.
 		tab.database = this.activeTab?.database ?? this.databases[0] ?? null;
+		tab.profileEnabled = settings.profileOnRun;
 		this.tabs.push(tab);
 		this.activeTabId = tab.id;
 		return tab;

@@ -3,9 +3,14 @@
 	import { m } from '$lib/paraglide/messages';
 	import LineChart from './LineChart.svelte';
 
-	/** Sequential violet ramp for the ordered latency quantiles (light→dark). */
-	const LATENCY_COLORS = { p50: '#ddd6fe', p95: '#a78bfa', p99: '#7c3aed' };
-	const ACCENT = '#a78bfa';
+	/** Sequential ember ramp for the ordered latency quantiles (light→dark).
+	 *  Tokens, not literals, so both themes stay legible on their own ground. */
+	const LATENCY_COLORS = {
+		p50: 'var(--nb-chart-1)',
+		p95: 'var(--nb-chart-2)',
+		p99: 'var(--nb-chart-3)'
+	};
+	const ACCENT = 'var(--nb-chart-accent)';
 
 	const POLL_MS = 2000;
 	const WINDOW = 150;
@@ -98,11 +103,11 @@
 	);
 </script>
 
-<div class="h-full overflow-auto p-4">
+<div class="h-full overflow-auto p-3.5">
 	{#if unavailable}
 		<p
-			class="mb-4 rounded-lg border border-err/40 bg-err/10 px-4 py-2 text-sm"
-			style="color: var(--nebula-err)"
+			class="mb-4 rounded-[10px] border px-4 py-2 text-[12.5px]"
+			style="border-color: var(--nb-err); background: var(--nb-accent-wash); color: var(--nb-err)"
 		>
 			{m.monitor_unavailable()}
 		</p>
@@ -111,9 +116,9 @@
 	<!-- stat tiles -->
 	<div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
 		{#snippet tile(label: string, value: string)}
-			<div class="rounded-lg border border-edge bg-surface p-3">
-				<p class="text-xs text-ink-muted">{label}</p>
-				<p class="mt-1 text-2xl font-semibold text-ink">{value}</p>
+			<div class="nb-glass p-3.5">
+				<p class="text-[11.5px] text-ink-muted">{label}</p>
+				<p class="mt-1 font-mono text-2xl font-semibold">{value}</p>
 			</div>
 		{/snippet}
 		{@render tile(m.stat_qps(), (qpsHistory.at(-1) ?? 0)?.toFixed(1) ?? '—')}
@@ -158,22 +163,22 @@
 	</div>
 
 	<!-- running queries -->
-	<h2 class="mb-2 text-sm font-medium text-ink">{m.running_queries()}</h2>
-	<div class="mb-4 overflow-x-auto rounded-lg border border-edge">
-		<table class="w-full text-left font-mono text-xs">
-			<thead class="bg-surface-2">
+	<h2 class="mb-2 text-sm font-extrabold">{m.running_queries()}</h2>
+	<div class="nb-glass mb-4 overflow-x-auto">
+		<table class="w-full text-left font-mono text-[11.5px]">
+			<thead>
 				<tr>
 					{#each [m.col_query_id(), m.col_user(), m.col_exec_time(), m.col_memory(), m.col_cpu(), m.col_scan(), m.col_sql(), ''] as header, i (i)}
-						<th class="border-b border-edge px-3 py-2 font-medium whitespace-nowrap">{header}</th>
+						<th class="border-b border-line px-3 py-2 font-sans text-[11px] font-medium whitespace-nowrap text-ink-muted">{header}</th>
 					{/each}
 				</tr>
 			</thead>
 			<tbody>
 				{#if mergedQueries.length === 0}
-					<tr><td colspan="8" class="px-3 py-3 text-ink-muted italic">{m.no_running_queries()}</td></tr>
+					<tr><td colspan="8" class="px-3 py-3 font-sans text-ink-muted italic">{m.no_running_queries()}</td></tr>
 				{/if}
 				{#each mergedQueries as query (str(query, 'QueryId'))}
-					<tr class="border-b border-edge/40 hover:bg-surface-2/60">
+					<tr class="border-b border-line-faint hover:bg-hover">
 						<td class="px-3 py-1.5 whitespace-nowrap" title={str(query, 'QueryId')}>
 							{str(query, 'QueryId').slice(0, 8)}…
 						</td>
@@ -187,8 +192,9 @@
 						</td>
 						<td class="px-3 py-1.5">
 							<button
-								class="rounded border border-edge px-2 py-0.5 text-ink-muted hover:text-ink"
-								style="border-color: var(--nebula-err)"
+								class="rounded-lg border px-2 py-0.5 font-sans text-[11px] transition-colors
+								       hover:bg-hover"
+								style="border-color: var(--nb-err); color: var(--nb-err)"
 								onclick={() => kill(str(query, 'QueryId'))}
 							>
 								{m.kill()}
@@ -201,19 +207,19 @@
 	</div>
 
 	<!-- sessions -->
-	<h2 class="mb-2 text-sm font-medium text-ink">{m.sessions()}</h2>
-	<div class="overflow-x-auto rounded-lg border border-edge">
-		<table class="w-full text-left font-mono text-xs">
-			<thead class="bg-surface-2">
+	<h2 class="mb-2 text-sm font-extrabold">{m.sessions()}</h2>
+	<div class="nb-glass overflow-x-auto">
+		<table class="w-full text-left font-mono text-[11.5px]">
+			<thead>
 				<tr>
 					{#each [m.col_id(), m.col_user(), m.col_host(), m.col_db(), m.col_command(), m.col_time(), m.col_state(), m.col_sql()] as header, i (i)}
-						<th class="border-b border-edge px-3 py-2 font-medium whitespace-nowrap">{header}</th>
+						<th class="border-b border-line px-3 py-2 font-sans text-[11px] font-medium whitespace-nowrap text-ink-muted">{header}</th>
 					{/each}
 				</tr>
 			</thead>
 			<tbody>
 				{#each processlist as row, i (i)}
-					<tr class="border-b border-edge/40 hover:bg-surface-2/60">
+					<tr class="border-b border-line-faint hover:bg-hover">
 						<td class="px-3 py-1.5">{str(row, 'Id')}</td>
 						<td class="px-3 py-1.5">{str(row, 'User')}</td>
 						<td class="px-3 py-1.5 whitespace-nowrap">{str(row, 'Host')}</td>

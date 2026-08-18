@@ -1,47 +1,266 @@
 @import 'tailwindcss';
 
 /*
- * Nebula design tokens — the single source of truth for the palette.
- * Space-inspired: near-black indigo ground, violet primary, blue secondary.
- * Consumed by UI chrome, the Monaco theme, and dashboard charts.
+ * Nebula "Aurora" design tokens — the single source of truth for the palette.
+ * Warm ink on a paper/ember ground, glass panels floating over blurred aurora
+ * blooms. Both themes are defined here; `data-theme` on <html> picks one and
+ * the bootstrap script in app.html resolves `system` before first paint.
+ *
+ * Consumed by the UI chrome, the Monaco themes, and the monitor charts.
  */
-:root {
+
+:root,
+:root[data-theme='dark'] {
+	color-scheme: dark;
+
 	/* ground */
-	--nebula-bg: #0a0a14;
-	--nebula-surface: #12111f;
-	--nebula-surface-2: #1a1830;
-	--nebula-border: #2b2749;
+	--nb-bg: #141110;
+	--nb-glass: #ffffff0d;
+	--nb-glass-2: #ffffff0f;
+	--nb-panel: #0f0c0bb3;
+	--nb-grid: #0b0908b3;
+	--nb-modal: #1a1413f2;
+	--nb-pop: #1a1211f2;
+	--nb-scrim: #0c0908d9;
 
 	/* ink */
-	--nebula-text: #e4e2f4;
-	--nebula-text-muted: #8f8ab3;
+	--nb-ink: #f4eeec;
+	--nb-ink-muted: #c8b6b1;
+	--nb-ink-faint: #8b7671;
 
-	/* accents */
-	--nebula-primary: #a78bfa; /* violet */
-	--nebula-primary-strong: #8b5cf6;
-	--nebula-secondary: #60a5fa; /* blue */
-	--nebula-glow: #c4b5fd;
+	/* edges */
+	--nb-panel-line: #ffffff1f;
+	--nb-line: #ffffff1f;
+	--nb-line-soft: #ffffff14;
+	--nb-line-faint: #ffffff12;
+	--nb-hover: #ffffff14;
+	--nb-active: #ffffff26;
+
+	/* accent */
+	--nb-accent: #ff563c;
+	--nb-accent-hover: #ff8a76;
+	--nb-accent-ink: #141110;
+	--nb-accent-soft: #ffb3a3;
+	--nb-accent-wash: #ff563c2e;
+	--nb-brand: #ff8a76;
 
 	/* signals */
-	--nebula-ok: #34d399;
-	--nebula-warn: #fbbf24;
-	--nebula-err: #f87171;
+	--nb-ok: #6fd8ae;
+	--nb-warn: #ffd7a1;
+	--nb-err: #ffb3a3;
+
+	/* charts — one sequential ember ramp, light to dark, for ordered series */
+	--nb-chart-1: #ffc4b8;
+	--nb-chart-2: #ff8a76;
+	--nb-chart-3: #ff563c;
+	--nb-chart-accent: #ff8a76;
+
+	/* elevation */
+	--nb-shadow: 0 26px 70px #000000a6;
+	--nb-shadow-sm: 0 16px 38px #000000a6;
+	--nb-shadow-panel: none;
+
+	/* aurora blooms — hue and weight per theme */
+	--nb-bloom-a: #ec3013;
+	--nb-bloom-b: #ff9783;
+	--nb-bloom-c: #7c1405;
+	--nb-bloom-a-o: 0.34;
+	--nb-bloom-b-o: 0.2;
+	--nb-bloom-c-o: 0.5;
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+
+	--nb-bg: #f7f4f3;
+	--nb-glass: #ffffff8c;
+	--nb-glass-2: #ffffffb3;
+	--nb-panel: #fffdfcd9;
+	--nb-grid: #fffefdd9;
+	--nb-modal: #fffdfcf7;
+	--nb-pop: #fffdfcf7;
+	--nb-scrim: #e9e6e3d9;
+
+	--nb-ink: #201e1d;
+	--nb-ink-muted: #201e1d99;
+	--nb-ink-faint: #201e1d59;
+
+	--nb-panel-line: #ffffffe6;
+	--nb-line: #201e1d1f;
+	--nb-line-soft: #201e1d14;
+	--nb-line-faint: #201e1d0f;
+	--nb-hover: #201e1d0d;
+	--nb-active: #201e1d14;
+
+	--nb-accent: #ec3013;
+	--nb-accent-hover: #dd2b0f;
+	--nb-accent-ink: #ffffff;
+	--nb-accent-soft: #ae1800;
+	--nb-accent-wash: #ec301324;
+	--nb-brand: #ec3013;
+
+	--nb-ok: #1f6b52;
+	--nb-warn: #9a6212;
+	--nb-err: #ae1800;
+
+	--nb-chart-1: #ff9783;
+	--nb-chart-2: #ec3013;
+	--nb-chart-3: #7c1405;
+	--nb-chart-accent: #ec3013;
+
+	--nb-shadow: 0 26px 70px #201e1d2e;
+	--nb-shadow-sm: 0 16px 38px #201e1d29;
+	--nb-shadow-panel: 0 8px 30px #201e1d0f;
+
+	--nb-bloom-a: #ff9783;
+	--nb-bloom-b: #ffc4b8;
+	--nb-bloom-c: #ec3013;
+	--nb-bloom-a-o: 0.5;
+	--nb-bloom-b-o: 0.6;
+	--nb-bloom-c-o: 0.16;
 }
 
 @theme {
-	--color-bg: var(--nebula-bg);
-	--color-surface: var(--nebula-surface);
-	--color-surface-2: var(--nebula-surface-2);
-	--color-edge: var(--nebula-border);
-	--color-ink: var(--nebula-text);
-	--color-ink-muted: var(--nebula-text-muted);
-	--color-primary: var(--nebula-primary);
-	--color-primary-strong: var(--nebula-primary-strong);
-	--color-secondary: var(--nebula-secondary);
-	--color-glow: var(--nebula-glow);
+	--font-sans: 'Archivo', system-ui, sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+
+	--color-bg: var(--nb-bg);
+	--color-glass: var(--nb-glass);
+	--color-glass-2: var(--nb-glass-2);
+	--color-panel: var(--nb-panel);
+	--color-grid: var(--nb-grid);
+
+	--color-ink: var(--nb-ink);
+	--color-ink-muted: var(--nb-ink-muted);
+	--color-ink-faint: var(--nb-ink-faint);
+
+	--color-line: var(--nb-line);
+	--color-line-soft: var(--nb-line-soft);
+	--color-line-faint: var(--nb-line-faint);
+	--color-panel-line: var(--nb-panel-line);
+	--color-hover: var(--nb-hover);
+	--color-active: var(--nb-active);
+
+	--color-accent: var(--nb-accent);
+	--color-accent-hover: var(--nb-accent-hover);
+	--color-accent-ink: var(--nb-accent-ink);
+	--color-accent-soft: var(--nb-accent-soft);
+	--color-accent-wash: var(--nb-accent-wash);
+	--color-brand: var(--nb-brand);
+
+	--color-ok: var(--nb-ok);
+	--color-warn: var(--nb-warn);
+	--color-err: var(--nb-err);
+
+	--radius-panel: 14px;
+	--radius-control: 10px;
+}
+
+html,
+body {
+	height: 100%;
 }
 
 body {
-	background: var(--nebula-bg);
-	color: var(--nebula-text);
+	margin: 0;
+	background: var(--nb-bg);
+	color: var(--nb-ink);
+	font-family: var(--font-sans);
+	font-size: 15px;
+	-webkit-font-smoothing: antialiased;
+}
+
+::selection {
+	background: color-mix(in srgb, var(--nb-accent) 32%, transparent);
+}
+
+:focus-visible {
+	outline: 2px solid var(--nb-accent);
+	outline-offset: 2px;
+}
+
+/* Scrollbars read as part of the glass rather than as OS chrome. */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--nb-line) transparent;
+}
+*::-webkit-scrollbar {
+	width: 9px;
+	height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+	background: var(--nb-line);
+	border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+	background: var(--nb-ink-faint);
+}
+*::-webkit-scrollbar-corner,
+*::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+/* — glass surfaces —
+   backdrop-filter is the whole trick: the aurora blooms sit behind the panels
+   and only show through as a wash. */
+.nb-glass {
+	background: var(--nb-glass);
+	backdrop-filter: blur(28px);
+	border: 1px solid var(--nb-panel-line);
+	border-radius: var(--radius-panel);
+	box-shadow: var(--nb-shadow-panel);
+}
+.nb-panel {
+	background: var(--nb-panel);
+	backdrop-filter: blur(30px);
+	border: 1px solid var(--nb-panel-line);
+	border-radius: var(--radius-panel);
+	box-shadow: var(--nb-shadow-panel);
+}
+
+/* — animations, matched to the design's easing — */
+@keyframes nb-fade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+@keyframes nb-modal {
+	from {
+		opacity: 0;
+		transform: translateY(10px) scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+@keyframes nb-pop {
+	from {
+		opacity: 0;
+		transform: translateY(-4px) scale(0.98);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+.nb-anim-fade {
+	animation: nb-fade 0.18s ease-out;
+}
+.nb-anim-modal {
+	animation: nb-modal 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.nb-anim-pop {
+	animation: nb-pop 0.16s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nb-anim-fade,
+	.nb-anim-modal,
+	.nb-anim-pop {
+		animation: none;
+	}
 }
