@@ -45,23 +45,38 @@ function auroraTheme(
 			{ token: 'comment', foreground: c.comment, fontStyle: 'italic' }
 		],
 		colors: {
+			// Transparent ground and gutter: the glass panel and the aurora behind
+			// it are meant to show through the code.
 			'editor.background': '#00000000',
+			'editorGutter.background': '#00000000',
+			'minimap.background': '#00000000',
 			'editor.foreground': c.ink,
 			'editor.lineHighlightBackground': c.accent + '14',
+			'editor.lineHighlightBorder': '#00000000',
 			'editor.selectionBackground': c.accent + '3d',
+			'editor.selectionHighlightBackground': c.accent + '1f',
+			'editor.wordHighlightBackground': c.accent + '1f',
 			'editorLineNumber.foreground': c.faint,
 			'editorLineNumber.activeForeground': c.muted,
 			'editorCursor.foreground': c.accent,
 			'editorIndentGuide.background1': c.border,
+			'editorIndentGuide.activeBackground1': c.faint,
+			'editorWhitespace.foreground': c.border,
 			'editorWidget.background': c.widget,
 			'editorWidget.border': c.border,
 			'editorSuggestWidget.background': c.widget,
+			'editorSuggestWidget.border': c.border,
 			'editorSuggestWidget.selectedBackground': c.accent + '33',
+			'editorSuggestWidget.highlightForeground': c.accent,
 			'editorHoverWidget.background': c.widget,
+			'editorHoverWidget.border': c.border,
+			'editorOverviewRuler.border': '#00000000',
 			'input.background': c.widget,
-			'minimap.background': '#00000000',
+			'input.border': c.border,
+			focusBorder: c.accent,
 			'scrollbarSlider.background': c.border,
-			'scrollbarSlider.hoverBackground': c.faint
+			'scrollbarSlider.hoverBackground': c.faint,
+			'scrollbarSlider.activeBackground': c.muted
 		}
 	};
 }

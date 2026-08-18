@@ -6,11 +6,17 @@
 	let {
 		value = $bindable(''),
 		onRun,
+		onSave,
+		onSearch,
 		completions
 	}: {
 		value?: string;
 		/** Called with the selection when there is one, else the whole buffer. */
 		onRun?: (sql: string) => void;
+		/** Ctrl/Cmd+S — bound inside Monaco so it fires while typing. */
+		onSave?: () => void;
+		/** Ctrl/Cmd+K — Monaco owns that chord by default, so take it back. */
+		onSearch?: () => void;
 		/** Live schema context for autocomplete. */
 		completions?: () => SchemaCompletionContext;
 	} = $props();
@@ -33,12 +39,21 @@
 				language: 'sql',
 				theme: editorTheme(theme.resolved),
 				automaticLayout: true,
-				minimap: { enabled: settings.minimap },
+				minimap: { enabled: settings.minimap, renderCharacters: false, maxColumn: 80 },
 				fontSize: settings.editorFontSize,
-				fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
 				lineHeight: 1.7,
+				fontFamily: "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+				fontLigatures: true,
 				padding: { top: 12, bottom: 12 },
-				renderLineHighlight: 'line',
+				lineNumbersMinChars: 3,
+				renderLineHighlight: 'all',
+				roundedSelection: false,
+				cursorBlinking: 'smooth',
+				cursorSmoothCaretAnimation: 'on',
+				smoothScrolling: true,
+				guides: { indentation: true, bracketPairs: true },
+				scrollbar: { verticalScrollbarSize: 11, horizontalScrollbarSize: 11 },
+				overviewRulerBorder: false,
 				scrollBeyondLastLine: false,
 				fixedOverflowWidgets: true
 			});
@@ -56,6 +71,9 @@
 					selection && !selection.isEmpty() ? model?.getValueInRange(selection) : null;
 				onRun?.(selected?.trim() || editor!.getValue());
 			});
+
+			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSave?.());
+			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => onSearch?.());
 		})();
 
 		return () => {
@@ -73,7 +91,7 @@
 	$effect(() => {
 		editor?.updateOptions({
 			fontSize: settings.editorFontSize,
-			minimap: { enabled: settings.minimap }
+			minimap: { enabled: settings.minimap, renderCharacters: false, maxColumn: 80 }
 		});
 	});
 

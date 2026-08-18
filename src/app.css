@@ -42,6 +42,7 @@
 	--nb-accent-ink: #141110;
 	--nb-accent-soft: #ffb3a3;
 	--nb-accent-wash: #ff563c2e;
+	--nb-select: #ff563c26;
 	--nb-brand: #ff8a76;
 
 	/* signals */
@@ -97,6 +98,7 @@
 	--nb-accent-ink: #ffffff;
 	--nb-accent-soft: #ae1800;
 	--nb-accent-wash: #ec301324;
+	--nb-select: #ec30131f;
 	--nb-brand: #ec3013;
 
 	--nb-ok: #1f6b52;
@@ -146,6 +148,7 @@
 	--color-accent-ink: var(--nb-accent-ink);
 	--color-accent-soft: var(--nb-accent-soft);
 	--color-accent-wash: var(--nb-accent-wash);
+	--color-select: var(--nb-select);
 	--color-brand: var(--nb-brand);
 
 	--color-ok: var(--nb-ok);
@@ -263,4 +266,10 @@ body {
 	.nb-anim-pop {
 		animation: none;
 	}
+}
+
+/* Chrome is furniture: it never gets a text cursor or a stray selection. */
+.chrome {
+	user-select: none;
+	cursor: default;
 }

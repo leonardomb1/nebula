@@ -79,6 +79,10 @@ export class Tab {
 	/** Result-panel selection: resultset index, -1 messages, -2 plan. */
 	activeResult = $state(0);
 	plan = $state<PlanState>(null);
+	/** The saved query this tab edits — null while it is still untitled. */
+	fileName = $state<string | null>(null);
+	/** What is on disk, so `dirty` is just a comparison. */
+	savedSql = $state('');
 	#source: EventSource | null = null;
 
 	constructor(title: string) {
@@ -87,6 +91,10 @@ export class Tab {
 
 	get running(): boolean {
 		return this.run.status === 'starting' || this.run.status === 'running';
+	}
+
+	get dirty(): boolean {
+		return this.sql !== this.savedSql;
 	}
 
 	async execute(sqlOverride?: string): Promise<void> {
@@ -248,12 +256,23 @@ export interface TableInfo {
 	columns: { name: string; type: string }[];
 }
 
+export interface QueryFile {
+	name: string;
+	updatedAt: number;
+}
+
 export class Workbench {
 	tabs = $state<Tab[]>([]);
 	activeTabId = $state<string | null>(null);
 	databases = $state<string[]>([]);
+	/** Warehouse unreachable — so the picker says so instead of "loading" forever. */
+	databasesFailed = $state(false);
 	/** Schema cache shared by the explorer tree and editor completions. */
 	tablesByDb = $state<Record<string, TableInfo[] | 'loading' | 'error'>>({});
+	/** The user's saved queries, newest name order as the server sorts them. */
+	files = $state<QueryFile[]>([]);
+	/** File the sidebar is currently renaming inline. */
+	renaming = $state<string | null>(null);
 
 	get activeTab(): Tab | null {
 		return this.tabs.find((tab) => tab.id === this.activeTabId) ?? null;
@@ -280,6 +299,7 @@ export class Workbench {
 
 	async loadDatabases(): Promise<void> {
 		const res = await fetch('/api/schema').catch(() => null);
+		this.databasesFailed = !res?.ok;
 		if (!res?.ok) return;
 		const { databases } = (await res.json()) as { databases: string[] };
 		this.databases = databases;
@@ -296,5 +316,115 @@ export class Workbench {
 		}
 		const { tables } = (await res.json()) as { tables: TableInfo[] };
 		this.tablesByDb[db] = tables;
+	}
+
+	/** Drops the schema cache and refetches; the tree refills what is expanded. */
+	async refreshSchema(): Promise<void> {
+		this.tablesByDb = {};
+		await this.loadDatabases();
+	}
+
+	// --- saved queries -----------------------------------------------------
+
+	async loadFiles(): Promise<void> {
+		const res = await fetch('/api/files').catch(() => null);
+		if (!res?.ok) return;
+		this.files = ((await res.json()) as { files: QueryFile[] }).files;
+	}
+
+	/** `<base>.sql`, suffixed until it does not collide with a saved query. */
+	#freeName(base: string): string {
+		const taken = new Set(this.files.map((file) => file.name));
+		if (!taken.has(`${base}.sql`)) return `${base}.sql`;
+		for (let n = 2; ; n++) {
+			if (!taken.has(`${base} ${n}.sql`)) return `${base} ${n}.sql`;
+		}
+	}
+
+	/** Opens a saved query, reusing the tab that already holds it. */
+	async openFile(name: string): Promise<void> {
+		const open = this.tabs.find((tab) => tab.fileName === name);
+		if (open) {
+			this.activeTabId = open.id;
+			return;
+		}
+
+		const res = await fetch(`/api/files/${encodeURIComponent(name)}`).catch(() => null);
+		if (!res?.ok) return;
+		const { sql } = (await res.json()) as { sql: string };
+
+		const tab = this.newTab(name);
+		tab.title = name.replace(/\.sql$/i, '');
+		tab.fileName = name;
+		tab.sql = sql;
+		tab.savedSql = sql;
+	}
+
+	/** Saves the tab, creating the file (and offering a rename) when untitled. */
+	async saveTab(tab: Tab): Promise<void> {
+		if (tab.fileName) {
+			const res = await fetch(`/api/files/${encodeURIComponent(tab.fileName)}`, {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ sql: tab.sql })
+			}).catch(() => null);
+			if (!res?.ok) return;
+			tab.savedSql = tab.sql;
+			void this.loadFiles();
+			return;
+		}
+
+		const name = this.#freeName(tab.title);
+		const res = await fetch('/api/files', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ name, sql: tab.sql })
+		}).catch(() => null);
+		if (!res?.ok) return;
+
+		tab.fileName = name;
+		tab.title = name.replace(/\.sql$/i, '');
+		tab.savedSql = tab.sql;
+		await this.loadFiles();
+		// A brand-new file lands in rename mode: naming it is the next thing
+		// anyone wants to do, and it beats prompting before the save.
+		this.renaming = name;
+	}
+
+	async renameFile(from: string, to: string): Promise<void> {
+		const target = to.trim();
+		if (!target || `${target}.sql` === from) return;
+
+		const res = await fetch(`/api/files/${encodeURIComponent(from)}`, {
+			method: 'PUT',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ renameTo: target })
+		}).catch(() => null);
+		if (!res?.ok) return;
+		const { name } = (await res.json()) as { name: string };
+
+		for (const tab of this.tabs) {
+			if (tab.fileName === from) {
+				tab.fileName = name;
+				tab.title = name.replace(/\.sql$/i, '');
+			}
+		}
+		await this.loadFiles();
+	}
+
+	async deleteFile(name: string): Promise<void> {
+		const res = await fetch(`/api/files/${encodeURIComponent(name)}`, {
+			method: 'DELETE'
+		}).catch(() => null);
+		if (!res?.ok) return;
+
+		// Tabs holding the deleted file keep their text, as an unsaved buffer.
+		for (const tab of this.tabs) {
+			if (tab.fileName === name) {
+				tab.fileName = null;
+				tab.savedSql = '';
+			}
+		}
+		await this.loadFiles();
 	}
 }

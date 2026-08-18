@@ -61,9 +61,9 @@
 	}
 </script>
 
-<figure class="nb-glass p-3.5">
-	<figcaption class="mb-1.5 flex items-baseline justify-between text-[11.5px]">
-		<span class="font-semibold">{title}</span>
+<figure class="rounded-lg border border-line bg-hover p-3">
+	<figcaption class="mb-1 flex items-baseline justify-between text-xs">
+		<span class="font-medium text-ink">{title}</span>
 		{#if series.length > 1}
 			<span class="flex gap-3">
 				{#each series as s (s.label)}
@@ -75,6 +75,7 @@
 			</span>
 		{/if}
 	</figcaption>
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<svg
 		viewBox="0 0 {W} {H}"
 		class="w-full"
@@ -137,7 +138,7 @@
 		</text>
 	</svg>
 	{#if hoverIndex !== null && times[hoverIndex] !== undefined}
-		<div class="mt-1.5 flex gap-3 font-mono text-[11px] text-ink-muted">
+		<div class="mt-1 flex gap-3 font-mono text-xs text-ink-muted">
 			<span>{timeLabel(times[hoverIndex])}</span>
 			{#each series as s (s.label)}
 				{@const v = s.values[hoverIndex]}

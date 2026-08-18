@@ -1,16 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { m } from '$lib/paraglide/messages';
+	import Icon, { type IconName } from './Icon.svelte';
 	import LineChart from './LineChart.svelte';
 
-	/** Sequential ember ramp for the ordered latency quantiles (light→dark).
-	 *  Tokens, not literals, so both themes stay legible on their own ground. */
-	const LATENCY_COLORS = {
-		p50: 'var(--nb-chart-1)',
-		p95: 'var(--nb-chart-2)',
-		p99: 'var(--nb-chart-3)'
-	};
-	const ACCENT = 'var(--nb-chart-accent)';
+	/** Sequential violet ramp for the ordered latency quantiles (light→dark). */
+	const LATENCY_COLORS = { p50: '#ddd6fe', p95: '#a78bfa', p99: '#7c3aed' };
+	const ACCENT = '#a78bfa';
 
 	const POLL_MS = 2000;
 	const WINDOW = 150;
@@ -103,28 +99,43 @@
 	);
 </script>
 
-<div class="h-full overflow-auto p-3.5">
+<div class="h-full overflow-auto p-5">
+	<header class="mb-4 flex items-center gap-2">
+		<Icon name="pulse" size={18} class="text-accent" />
+		<h1 class="text-sm font-semibold tracking-wide text-ink">{m.monitor()}</h1>
+		{#if !unavailable && latest}
+			<span class="flex items-center gap-1.5 text-[11px] text-ink-faint">
+				<span class="h-1.5 w-1.5 rounded-full bg-ok"></span>
+				{POLL_MS / 1000}s
+			</span>
+		{/if}
+	</header>
+
 	{#if unavailable}
 		<p
-			class="mb-4 rounded-[10px] border px-4 py-2 text-[12.5px]"
-			style="border-color: var(--nb-err); background: var(--nb-accent-wash); color: var(--nb-err)"
+			class="mb-4 flex items-center gap-2 rounded-lg border border-err/30 bg-err/5 px-4 py-2 text-sm text-err"
 		>
+			<Icon name="alert" size={15} />
 			{m.monitor_unavailable()}
 		</p>
 	{/if}
 
 	<!-- stat tiles -->
 	<div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-		{#snippet tile(label: string, value: string)}
-			<div class="nb-glass p-3.5">
-				<p class="text-[11.5px] text-ink-muted">{label}</p>
-				<p class="mt-1 font-mono text-2xl font-semibold">{value}</p>
+		{#snippet tile(icon: IconName, label: string, value: string)}
+			<div class="rounded-lg border border-line bg-hover p-3.5">
+				<p class="flex items-center gap-1.5 text-[11px] tracking-wide text-ink-muted uppercase">
+					<Icon name={icon} size={13} class="text-ink-faint" />
+					{label}
+				</p>
+				<p class="mt-1.5 font-mono text-2xl font-semibold text-ink tabular-nums">{value}</p>
 			</div>
 		{/snippet}
-		{@render tile(m.stat_qps(), (qpsHistory.at(-1) ?? 0)?.toFixed(1) ?? '—')}
-		{@render tile(m.stat_connections(), String(latest?.connections ?? '—'))}
-		{@render tile(m.stat_p95(), latest ? `${latest.latencyMs.p95} ms` : '—')}
+		{@render tile('zap', m.stat_qps(), (qpsHistory.at(-1) ?? 0)?.toFixed(1) ?? '—')}
+		{@render tile('link', m.stat_connections(), String(latest?.connections ?? '—'))}
+		{@render tile('clock', m.stat_p95(), latest ? `${latest.latencyMs.p95} ms` : '—')}
 		{@render tile(
+			'pulse',
 			m.stat_heap(),
 			latest?.heap.max ? `${Math.round((latest.heap.used / latest.heap.max) * 100)}%` : '—'
 		)}
@@ -163,19 +174,22 @@
 	</div>
 
 	<!-- running queries -->
-	<h2 class="mb-2 text-sm font-extrabold">{m.running_queries()}</h2>
-	<div class="nb-glass mb-4 overflow-x-auto">
-		<table class="w-full text-left font-mono text-[11.5px]">
-			<thead>
+	<h2 class="mb-2 flex items-center gap-2 text-[13px] font-medium text-ink">
+		<Icon name="play" size={12} class="text-accent" />
+		{m.running_queries()}
+	</h2>
+	<div class="mb-5 overflow-x-auto rounded-lg border border-line">
+		<table class="w-full text-left font-mono text-xs">
+			<thead class="bg-hover">
 				<tr>
 					{#each [m.col_query_id(), m.col_user(), m.col_exec_time(), m.col_memory(), m.col_cpu(), m.col_scan(), m.col_sql(), ''] as header, i (i)}
-						<th class="border-b border-line px-3 py-2 font-sans text-[11px] font-medium whitespace-nowrap text-ink-muted">{header}</th>
+						<th class="border-b border-line px-3 py-2 font-medium whitespace-nowrap">{header}</th>
 					{/each}
 				</tr>
 			</thead>
 			<tbody>
 				{#if mergedQueries.length === 0}
-					<tr><td colspan="8" class="px-3 py-3 font-sans text-ink-muted italic">{m.no_running_queries()}</td></tr>
+					<tr><td colspan="8" class="px-3 py-3 text-ink-muted italic">{m.no_running_queries()}</td></tr>
 				{/if}
 				{#each mergedQueries as query (str(query, 'QueryId'))}
 					<tr class="border-b border-line-faint hover:bg-hover">
@@ -192,11 +206,10 @@
 						</td>
 						<td class="px-3 py-1.5">
 							<button
-								class="rounded-lg border px-2 py-0.5 font-sans text-[11px] transition-colors
-								       hover:bg-hover"
-								style="border-color: var(--nb-err); color: var(--nb-err)"
+								class="flex items-center gap-1 rounded-md border border-err/40 px-2 py-0.5 text-err transition hover:bg-err/10"
 								onclick={() => kill(str(query, 'QueryId'))}
 							>
+								<Icon name="ban" size={12} />
 								{m.kill()}
 							</button>
 						</td>
@@ -207,13 +220,16 @@
 	</div>
 
 	<!-- sessions -->
-	<h2 class="mb-2 text-sm font-extrabold">{m.sessions()}</h2>
-	<div class="nb-glass overflow-x-auto">
-		<table class="w-full text-left font-mono text-[11.5px]">
-			<thead>
+	<h2 class="mb-2 flex items-center gap-2 text-[13px] font-medium text-ink">
+		<Icon name="user" size={13} class="text-accent-soft" />
+		{m.sessions()}
+	</h2>
+	<div class="overflow-x-auto rounded-lg border border-line">
+		<table class="w-full text-left font-mono text-xs">
+			<thead class="bg-hover">
 				<tr>
 					{#each [m.col_id(), m.col_user(), m.col_host(), m.col_db(), m.col_command(), m.col_time(), m.col_state(), m.col_sql()] as header, i (i)}
-						<th class="border-b border-line px-3 py-2 font-sans text-[11px] font-medium whitespace-nowrap text-ink-muted">{header}</th>
+						<th class="border-b border-line px-3 py-2 font-medium whitespace-nowrap">{header}</th>
 					{/each}
 				</tr>
 			</thead>

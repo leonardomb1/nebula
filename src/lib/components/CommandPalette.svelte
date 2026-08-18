@@ -1,164 +1,190 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { m } from '$lib/paraglide/messages';
-	import type { Workbench } from '$lib/workbench.svelte';
+	import type { QueryFile } from '$lib/workbench.svelte';
+	import Icon, { type IconName } from './Icon.svelte';
 
 	let {
-		workbench,
-		onPickTable,
-		onClose
+		files,
+		onclose,
+		onOpenFile,
+		onUseDatabase,
+		onSelectTop,
+		onInsert
 	}: {
-		workbench: Workbench;
-		/** Inserts a qualified table name into the active editor. */
-		onPickTable: (db: string, table: string) => void;
-		onClose: () => void;
+		files: QueryFile[];
+		onclose: () => void;
+		onOpenFile: (name: string) => void;
+		onUseDatabase: (db: string) => void;
+		onSelectTop: (db: string, table: string) => void;
+		onInsert: (text: string) => void;
 	} = $props();
 
-	interface Entry {
-		group: string;
+	interface Hit {
+		icon: IconName;
 		label: string;
-		sub: string;
+		hint: string;
+		section: string;
 		run: () => void;
 	}
 
-	const LIMIT = 40;
+	let term = $state('');
+	let hits = $state<Hit[]>([]);
+	let active = $state(0);
+	let loading = $state(false);
 
-	let query = $state('');
-	let cursor = $state(0);
+	/** Saved queries live in the client already — matched without a round trip. */
+	function fileHits(needle: string): Hit[] {
+		return files
+			.filter((file) => file.name.toLowerCase().includes(needle))
+			.slice(0, 8)
+			.map((file) => ({
+				icon: 'query' as const,
+				label: file.name.replace(/\.sql$/i, ''),
+				hint: '',
+				section: m.queries(),
+				run: () => onOpenFile(file.name)
+			}));
+	}
 
-	// Tables only become searchable once their database has been fetched, so
-	// the palette warms the whole schema cache the moment it opens.
-	onMount(() => {
-		for (const db of workbench.databases) void workbench.loadTables(db);
-	});
-
-	let entries = $derived.by(() => {
-		const needle = query.trim().toLowerCase();
-		const hit = (text: string) => !needle || text.toLowerCase().includes(needle);
-		const found: Entry[] = [];
-
-		for (const tab of workbench.tabs) {
-			if (!hit(tab.title)) continue;
-			found.push({
-				group: m.search_group_tabs(),
-				label: tab.title,
-				sub: tab.sql.trim().split('\n')[0]?.slice(0, 60) ?? '',
-				run: () => (workbench.activeTabId = tab.id)
-			});
+	async function search(raw: string): Promise<void> {
+		const needle = raw.trim().toLowerCase();
+		if (!needle) {
+			hits = [];
+			return;
 		}
 
-		for (const db of workbench.databases) {
-			if (!hit(db)) continue;
-			found.push({
-				group: m.search_group_databases(),
+		const local = fileHits(needle);
+		hits = local;
+		active = 0;
+		loading = true;
+
+		const res = await fetch(`/api/search?q=${encodeURIComponent(raw.trim())}`).catch(() => null);
+		loading = false;
+		// A slower response for an older term must not overwrite the current one.
+		if (!res?.ok || raw !== term) return;
+
+		const found = (await res.json()) as {
+			databases: string[];
+			tables: { db: string; name: string }[];
+			columns: { db: string; table: string; name: string }[];
+		};
+
+		hits = [
+			...local,
+			...found.databases.map((db) => ({
+				icon: 'explorer' as const,
 				label: db,
-				sub: '',
-				run: () => {
-					const tab = workbench.activeTab;
-					if (tab) tab.database = db;
-				}
-			});
-		}
+				hint: '',
+				section: m.databases(),
+				run: () => onUseDatabase(db)
+			})),
+			...found.tables.map((table) => ({
+				icon: 'table' as const,
+				label: table.name,
+				hint: table.db,
+				section: m.tables(),
+				run: () => onSelectTop(table.db, table.name)
+			})),
+			...found.columns.map((column) => ({
+				icon: 'column' as const,
+				label: column.name,
+				hint: `${column.db}.${column.table}`,
+				section: m.columns(),
+				run: () => onInsert(`\`${column.name}\``)
+			}))
+		];
+		active = 0;
+	}
 
-		for (const db of workbench.databases) {
-			const tables = workbench.tablesByDb[db];
-			if (!Array.isArray(tables)) continue;
-			for (const table of tables) {
-				if (!hit(table.name) && !hit(db)) continue;
-				found.push({
-					group: m.search_group_tables(),
-					label: table.name,
-					sub: db,
-					run: () => onPickTable(db, table.name)
-				});
-				if (found.length >= LIMIT) return found;
-			}
-		}
-		return found;
+	let debounce: ReturnType<typeof setTimeout>;
+	$effect(() => {
+		const raw = term;
+		clearTimeout(debounce);
+		debounce = setTimeout(() => void search(raw), 160);
+		return () => clearTimeout(debounce);
 	});
 
-	let index = $derived(Math.min(cursor, Math.max(0, entries.length - 1)));
+	function choose(hit: Hit | undefined): void {
+		if (!hit) return;
+		hit.run();
+		onclose();
+	}
 
 	function onKeydown(event: KeyboardEvent): void {
-		if (event.key === 'Escape') return onClose();
-		if (event.key === 'ArrowDown') {
+		if (event.key === 'Escape') onclose();
+		else if (event.key === 'ArrowDown') {
 			event.preventDefault();
-			cursor = Math.min(index + 1, entries.length - 1);
+			active = Math.min(hits.length - 1, active + 1);
 		} else if (event.key === 'ArrowUp') {
 			event.preventDefault();
-			cursor = Math.max(index - 1, 0);
+			active = Math.max(0, active - 1);
 		} else if (event.key === 'Enter') {
 			event.preventDefault();
-			pick(index);
+			choose(hits[active]);
 		}
 	}
 
-	function pick(at: number): void {
-		entries[at]?.run();
-		onClose();
+	function focus(node: HTMLInputElement) {
+		node.focus();
 	}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div
-	class="nb-anim-fade fixed inset-0 z-40 flex justify-center px-4 pt-[12vh] backdrop-blur-[4px]"
-	style="background: var(--nb-scrim)"
-	onclick={onClose}
+	class="fixed inset-0 z-40 flex justify-center bg-black/40 pt-[12vh]"
+	onclick={(e) => e.target === e.currentTarget && onclose()}
 >
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
-		tabindex="-1"
-		role="dialog"
-		aria-modal="true"
-		aria-label={m.search()}
-		class="nb-anim-modal flex max-h-[62vh] w-[560px] max-w-full flex-col overflow-hidden
-		       rounded-2xl border border-line backdrop-blur-[30px]"
-		style="background: var(--nb-modal); box-shadow: var(--nb-shadow)"
-		onclick={(event) => event.stopPropagation()}
+		class="flex h-fit max-h-[60vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-line bg-hover shadow-2xl shadow-black/50"
 	>
-		<div class="flex items-center gap-2.5 border-b border-line-soft px-3.5 py-3">
-			<span class="text-ink-faint">⌕</span>
+		<div class="flex items-center gap-2 border-b border-line px-3">
+			<Icon name="search" size={15} class="text-ink-faint" />
+			<!-- svelte-ignore a11y_autofocus -->
 			<input
-				{@attach (node) => node.focus()}
-				bind:value={query}
+				bind:value={term}
+				use:focus
 				onkeydown={onKeydown}
-				oninput={() => (cursor = 0)}
 				placeholder={m.search_placeholder()}
-				class="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-ink-faint"
+				class="h-11 min-w-0 flex-1 bg-transparent text-[13px] text-ink placeholder:text-ink-faint focus:outline-none"
 			/>
-			<span class="shrink-0 rounded-lg border border-line px-2 py-0.5 font-mono text-[10px] text-ink-muted">
-				⎋
-			</span>
-		</div>
-
-		<div class="min-h-0 flex-1 overflow-auto p-1.5">
-			{#if entries.length === 0}
-				<p class="px-3 py-4 text-[12.5px] text-ink-muted">{m.search_empty()}</p>
+			{#if loading}
+				<Icon name="spinner" size={14} class="animate-spin text-ink-faint" />
 			{/if}
-			{#each entries as entry, i (entry.group + entry.sub + entry.label)}
-				{#if i === 0 || entries[i - 1].group !== entry.group}
-					<p
-						class="px-2.5 pt-2 pb-1 text-[10px] font-medium tracking-[0.1em] text-ink-muted uppercase"
-					>
-						{entry.group}
-					</p>
-				{/if}
-				<button
-					class="flex w-full items-baseline gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left
-					       {i === index ? 'bg-active' : 'hover:bg-hover'}"
-					onclick={() => pick(i)}
-					onmousemove={() => (cursor = i)}
-				>
-					<span class="truncate font-mono text-[12.5px]">{entry.label}</span>
-					{#if entry.sub}
-						<span class="ml-auto shrink-0 truncate text-[11px] text-ink-muted">{entry.sub}</span>
-					{/if}
-				</button>
-			{/each}
+			<kbd class="rounded border border-line px-1.5 py-0.5 text-[10px] text-ink-faint">Esc</kbd>
 		</div>
 
-		<div class="border-t border-line-soft px-3.5 py-2 text-[11px] text-ink-muted">
-			{m.search_hint()}
-		</div>
+		<ul class="overflow-auto py-1">
+			{#each hits as hit, i (hit.section + hit.hint + hit.label)}
+				{@const first = i === 0 || hits[i - 1].section !== hit.section}
+				{#if first}
+					<li
+						class="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-widest text-ink-faint uppercase"
+					>
+						{hit.section}
+					</li>
+				{/if}
+				<li>
+					<button
+						class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] {i === active
+							? 'bg-hover text-ink'
+							: 'text-ink-muted hover:bg-active'}"
+						onmouseenter={() => (active = i)}
+						onclick={() => choose(hit)}
+					>
+						<Icon name={hit.icon} size={14} class="text-ink-faint" />
+						<span class="truncate">{hit.label}</span>
+						{#if hit.hint}
+							<span class="ml-auto truncate pl-3 font-mono text-[11px] text-ink-faint">
+								{hit.hint}
+							</span>
+						{/if}
+					</button>
+				</li>
+			{/each}
+
+			{#if term.trim() && hits.length === 0 && !loading}
+				<li class="px-3 py-6 text-center text-[12px] text-ink-faint">{m.search_empty()}</li>
+			{/if}
+		</ul>
 	</div>
 </div>

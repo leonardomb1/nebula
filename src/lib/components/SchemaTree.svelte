@@ -1,129 +1,169 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages';
 	import type { TableInfo } from '$lib/workbench.svelte';
+	import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
+	import Icon from './Icon.svelte';
 
 	let {
 		databases,
 		tablesByDb,
-		activeDb,
 		loadTables,
-		onInsert
+		onInsert,
+		onRefresh,
+		onUseDatabase,
+		onSelectTop
 	}: {
 		databases: string[];
 		tablesByDb: Record<string, TableInfo[] | 'loading' | 'error'>;
-		/** The current tab's database — its tables sit flat at the top. */
-		activeDb: string | null;
 		loadTables: (db: string) => void;
 		/** Double-click inserts a qualified name into the editor. */
 		onInsert?: (text: string) => void;
+		onRefresh?: () => void;
+		onUseDatabase?: (db: string) => void;
+		onSelectTop?: (db: string, table: string) => void;
 	} = $props();
 
 	let expandedDbs = $state<Record<string, boolean>>({});
 	let expandedTables = $state<Record<string, boolean>>({});
-
-	// The current database is always open, so its tables are always wanted.
-	$effect(() => {
-		if (activeDb) loadTables(activeDb);
-	});
+	let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
 
 	function toggleDb(db: string): void {
 		expandedDbs[db] = !expandedDbs[db];
 		if (expandedDbs[db]) loadTables(db);
 	}
 
-	function count(db: string): string {
-		const tables = tablesByDb[db];
-		return Array.isArray(tables) ? String(tables.length) : '';
+	// A refresh drops the schema cache; anything still expanded refetches itself.
+	$effect(() => {
+		for (const db of Object.keys(expandedDbs)) {
+			if (expandedDbs[db] && !tablesByDb[db]) loadTables(db);
+		}
+	});
+
+	const quoted = (db: string, table?: string) =>
+		table ? `\`${db}\`.\`${table}\`` : `\`${db}\``;
+
+	function copy(text: string): void {
+		void navigator.clipboard?.writeText(text).catch(() => {});
 	}
 
-	let others = $derived(databases.filter((db) => db !== activeDb));
+	function open(event: MouseEvent, items: MenuItem[]): void {
+		event.preventDefault();
+		menu = { x: event.clientX, y: event.clientY, items };
+	}
+
+	function dbMenu(db: string): MenuItem[] {
+		return [
+			{ label: m.set_current_db(), icon: 'check', action: () => onUseDatabase?.(db) },
+			{ label: m.insert_name(), icon: 'plus', action: () => onInsert?.(quoted(db)) },
+			{ label: m.copy_name(), icon: 'query', action: () => copy(db) },
+			{ label: m.refresh(), icon: 'refresh', action: () => onRefresh?.() }
+		];
+	}
+
+	function tableMenu(db: string, table: string): MenuItem[] {
+		return [
+			{ label: m.select_top(), icon: 'play', action: () => onSelectTop?.(db, table) },
+			{ label: m.insert_name(), icon: 'plus', action: () => onInsert?.(quoted(db, table)) },
+			{ label: m.copy_name(), icon: 'query', action: () => copy(`${db}.${table}`) },
+			{ label: m.refresh(), icon: 'refresh', action: () => onRefresh?.() }
+		];
+	}
+
+	function columnMenu(column: string): MenuItem[] {
+		return [
+			{ label: m.insert_name(), icon: 'plus', action: () => onInsert?.(`\`${column}\``) },
+			{ label: m.copy_name(), icon: 'query', action: () => copy(column) }
+		];
+	}
+
+	/** One row of the tree — 22px, full-bleed hover, VS Code density. */
+	const ROW =
+		'group flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-[13px] transition hover:bg-hover';
 </script>
 
-<nav class="flex h-full min-h-0 flex-col" aria-label={m.explorer()}>
-	<div class="flex shrink-0 items-baseline gap-2 px-3.5 pt-3.5 pb-2.5">
-		<span class="text-sm font-extrabold">{m.explorer()}</span>
-		<span class="ml-auto truncate font-mono text-[11px] text-ink-muted">
-			{activeDb ?? m.no_database()}
-		</span>
-	</div>
+<nav class="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label={m.databases()}>
+	<ul class="min-h-0 flex-1 overflow-auto pb-2">
+		{#each databases as db (db)}
+			{@const tables = tablesByDb[db]}
+			<li>
+				<button
+					class="{ROW} pl-1.5"
+					onclick={() => toggleDb(db)}
+					oncontextmenu={(e) => open(e, dbMenu(db))}
+				>
+					<Icon
+						name={expandedDbs[db] ? 'chevron-down' : 'chevron-right'}
+						size={12}
+						class="text-ink-faint"
+					/>
+					<Icon name="explorer" size={14} class="text-accent" />
+					<span class="truncate">{db}</span>
+				</button>
 
-	<div class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto px-[7px] pb-[7px]">
-		{#if activeDb}
-			{@const tables = tablesByDb[activeDb]}
-			{#if tables === 'loading'}
-				<p class="px-3 py-1 text-[11px] text-ink-muted">{m.loading()}</p>
-			{:else if tables === 'error'}
-				<p class="px-3 py-1 text-[11px] text-err">{m.schema_error()}</p>
-			{:else if Array.isArray(tables)}
-				{#if tables.length === 0}
-					<p class="px-3 py-1 text-[11px] text-ink-muted italic">{m.schema_empty()}</p>
-				{/if}
-				{#each tables as table (table.name)}
-					{@const key = `${activeDb}.${table.name}`}
-					<button
-						class="flex h-[29px] shrink-0 items-center gap-[9px] rounded-[10px] px-[11px]
-						       text-left font-mono text-xs transition-colors hover:bg-hover"
-						onclick={() => (expandedTables[key] = !expandedTables[key])}
-						ondblclick={() => onInsert?.(`\`${activeDb}\`.\`${table.name}\``)}
-						title={key}
+				{#if expandedDbs[db]}
+					<ul
+						class="relative before:absolute before:top-0 before:bottom-0 before:left-[13px] before:w-px before:bg-line-soft"
 					>
-						<span class="text-[9px] text-ink-faint">▦</span>
-						<span class="truncate">{table.name}</span>
-					</button>
-					{#if expandedTables[key]}
-						<ul class="mb-1 ml-[22px] shrink-0 border-l border-line-soft pl-2">
-							{#each table.columns as column (column.name)}
-								<li class="flex justify-between gap-2 py-[3px] font-mono text-[11px]">
-									<span class="truncate">{column.name}</span>
-									<span class="shrink-0 text-ink-faint">{column.type}</span>
+						{#if tables === 'loading'}
+							<li class="flex items-center gap-1.5 py-1 pl-8 text-xs text-ink-faint">
+								<Icon name="spinner" size={12} class="animate-spin" />
+								{m.loading()}
+							</li>
+						{:else if tables === 'error'}
+							<li class="flex items-center gap-1.5 py-1 pl-8 text-xs text-err">
+								<Icon name="alert" size={12} />
+								{m.schema_error()}
+							</li>
+						{:else if Array.isArray(tables)}
+							{#if tables.length === 0}
+								<li class="py-1 pl-8 text-xs text-ink-faint italic">{m.schema_empty()}</li>
+							{/if}
+							{#each tables as table (table.name)}
+								{@const key = `${db}.${table.name}`}
+								<li>
+									<button
+										class="{ROW} pl-5"
+										onclick={() => (expandedTables[key] = !expandedTables[key])}
+										ondblclick={() => onInsert?.(quoted(db, table.name))}
+										oncontextmenu={(e) => open(e, tableMenu(db, table.name))}
+										title={key}
+									>
+										<Icon
+											name={expandedTables[key] ? 'chevron-down' : 'chevron-right'}
+											size={12}
+											class="text-ink-faint"
+										/>
+										<Icon name="table" size={14} class="text-accent-soft" />
+										<span class="truncate">{table.name}</span>
+									</button>
+
+									{#if expandedTables[key]}
+										<ul>
+											{#each table.columns as column (column.name)}
+												<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+												<li
+													class="flex items-center gap-1.5 py-[3px] pr-2 pl-[38px] text-[12px] hover:bg-hover"
+													oncontextmenu={(e) => open(e, columnMenu(column.name))}
+												>
+													<Icon name="column" size={13} class="text-ink-faint" />
+													<span class="truncate">{column.name}</span>
+													<span class="ml-auto shrink-0 font-mono text-[11px] text-ink-faint">
+														{column.type}
+													</span>
+												</li>
+											{/each}
+										</ul>
+									{/if}
 								</li>
 							{/each}
-						</ul>
-					{/if}
-				{/each}
-			{/if}
-		{/if}
-
-		{#if others.length && activeDb}
-			<div class="my-1.5 h-px shrink-0 bg-line-soft"></div>
-		{/if}
-
-		{#each others as db (db)}
-			{@const tables = tablesByDb[db]}
-			<button
-				class="flex h-[29px] shrink-0 items-center gap-[9px] rounded-[10px] px-[11px] text-left
-				       font-mono text-[12.5px] text-ink-muted transition-colors hover:bg-hover"
-				onclick={() => toggleDb(db)}
-			>
-				<span class="w-2 text-[8px]">{expandedDbs[db] ? '▾' : '▸'}</span>
-				<span class="truncate">{db}</span>
-				<span class="ml-auto shrink-0 font-mono text-[10.5px] text-ink-faint">{count(db)}</span>
-			</button>
-			{#if expandedDbs[db]}
-				<div class="mb-1 ml-[22px] flex shrink-0 flex-col border-l border-line-soft pl-1">
-					{#if tables === 'loading'}
-						<p class="px-2 py-1 text-[11px] text-ink-muted">{m.loading()}</p>
-					{:else if tables === 'error'}
-						<p class="px-2 py-1 text-[11px] text-err">{m.schema_error()}</p>
-					{:else if Array.isArray(tables)}
-						{#if tables.length === 0}
-							<p class="px-2 py-1 text-[11px] text-ink-muted italic">{m.schema_empty()}</p>
 						{/if}
-						{#each tables as table (table.name)}
-							<button
-								class="flex h-[26px] items-center gap-[9px] rounded-[9px] px-2 text-left
-								       font-mono text-[11.5px] transition-colors hover:bg-hover"
-								ondblclick={() => onInsert?.(`\`${db}\`.\`${table.name}\``)}
-								onclick={() => onInsert?.(`\`${db}\`.\`${table.name}\``)}
-								title="{db}.{table.name}"
-							>
-								<span class="text-[9px] text-ink-faint">▦</span>
-								<span class="truncate">{table.name}</span>
-							</button>
-						{/each}
-					{/if}
-				</div>
-			{/if}
+					</ul>
+				{/if}
+			</li>
 		{/each}
-	</div>
+	</ul>
 </nav>
+
+{#if menu}
+	<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />
+{/if}
